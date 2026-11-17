@@ -18,6 +18,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.Calendar
 
 private const val BG = 0xFFE5FAF7.toInt()
 private const val INK = 0xFF16465A.toInt()
@@ -61,6 +62,11 @@ class MainActivity : Activity() {
             addView(label("GANHOS DE HOJE", 12, MUTED, true))
             addView(label("R$ ${money(income)}", 30, INK, true))
             addView(label("${readArray("income").length()} lançamento(s) registrado(s)", 12, MUTED))
+            addView(label("EVOLUÇÃO DOS ÚLTIMOS 7 DIAS", 11, MUTED, true))
+            addView(IncomeChart(this@MainActivity, lastSevenDaysIncome()).apply {
+                layoutParams = LinearLayout.LayoutParams(-1, 190).apply { setMargins(0, 4, 0, 0) }
+            })
+            addView(label("Toque em Ganhos para registrar uma receita e atualizar este gráfico.", 11, MUTED))
         }
         card(b) {
             addView(label("MOVIMENTO DE HOJE", 12, MUTED, true))
@@ -84,11 +90,13 @@ class MainActivity : Activity() {
         card(b) { addView(label("TOTAL DE HOJE",12,MUTED,true)); addView(label("R$ ${money(total)}",32,INK,true)) }
         val value = field("Valor recebido (ex.: 150,00)", true)
         val desc = field("Origem / descrição", false)
+        b.addView(value)
+        b.addView(desc)
         action(b,"SALVAR RECEITA") {
             val amount = value.text.toString().trim().replace(".","").replace(",",".").toDoubleOrNull()
             if (amount == null || amount <= 0) toast("Digite um valor válido") else {
                 val a = readArray("income"); a.put(JSONObject().put("date",date).put("amount",amount).put("desc",desc.text.toString().ifBlank { "Receita" }))
-                saveArray("income",a); showPage("money"); toast("Receita salva")
+                saveArray("income",a); IncomeWidgetProvider.refreshAll(this@MainActivity); showPage("money"); toast("Receita salva")
             }
         }
         b.addView(label("HISTÓRICO",13,MUTED,true))
@@ -102,6 +110,7 @@ class MainActivity : Activity() {
         val totals = allExerciseTotals()
         card(b) { addView(label("ACUMULADO",12,MUTED,true)); addView(label("${totals.first} flexões  •  ${totals.second} barras",22,INK,true)) }
         val push = field("Quantidade de flexões",true); val pull = field("Quantidade de barras",true); val note=field("Observação (opcional)",false)
+        b.addView(push); b.addView(pull); b.addView(note)
         action(b,"SALVAR TREINO") {
             val p=push.text.toString().toIntOrNull() ?: 0; val q=pull.text.toString().toIntOrNull() ?: 0
             if(p<0||q<0||(p==0&&q==0)) toast("Informe pelo menos uma quantidade válida") else {
@@ -121,6 +130,7 @@ class MainActivity : Activity() {
         header(b,"03 / IMPACTO","Projeto social")
         card(b) { addView(label("DIÁRIO DE EVOLUÇÃO",12,MUTED,true)); addView(label("Registre o que saiu do papel.",20,INK,true)); addView(label("Documente entregas, contatos, reuniões, resultados e próximos passos.",12,MUTED)) }
         val title=field("Título do avanço",false); val detail=field("O que aconteceu? Qual o próximo passo?",false, true)
+        b.addView(title); b.addView(detail)
         action(b,"REGISTRAR AVANÇO") {
             if(title.text.isNullOrBlank() || detail.text.isNullOrBlank()) toast("Preencha título e descrição") else {
                 val a=readArray("social"); a.put(JSONObject().put("date",date).put("title",title.text.toString()).put("detail",detail.text.toString()))
@@ -145,6 +155,29 @@ class MainActivity : Activity() {
     private fun todayIncome():Double { val a=readArray("income"); var s=0.0; for(i in 0 until a.length()){val o=a.getJSONObject(i);if(o.optString("date")==date)s+=o.optDouble("amount")};return s }
     private fun todayExercise():Pair<Int,Int>{val a=readArray("workouts");var p=0;var q=0;for(i in 0 until a.length()){val o=a.getJSONObject(i);if(o.optString("date")==date){p+=o.optInt("push");q+=o.optInt("pull")}};return p to q}
     private fun allExerciseTotals():Pair<Int,Int>{val a=readArray("workouts");var p=0;var q=0;for(i in 0 until a.length()){p+=a.getJSONObject(i).optInt("push");q+=a.getJSONObject(i).optInt("pull")};return p to q}
+    private fun lastSevenDaysIncome(): List<Pair<String, Double>> {
+        val totals = linkedMapOf<String, Double>()
+        val keyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val labelFormat = SimpleDateFormat("dd/MM", Locale("pt", "BR"))
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.DAY_OF_YEAR, -6)
+        repeat(7) {
+            val key = keyFormat.format(calendar.time)
+            totals[key] = 0.0
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        val entries = readArray("income")
+        for (i in 0 until entries.length()) {
+            val item = entries.optJSONObject(i) ?: continue
+            val key = item.optString("date")
+            if (totals.containsKey(key)) totals[key] = (totals[key] ?: 0.0) + item.optDouble("amount")
+        }
+        return totals.map { (key, amount) ->
+            val parsed = try { keyFormat.parse(key) } catch (_: Exception) { null }
+            (if (parsed != null) labelFormat.format(parsed) else key.takeLast(5)) to amount
+        }
+    }
+
     private fun money(v:Double)=String.format(Locale("pt","BR"),"%,.2f",v)
     private fun toast(s:String){Toast.makeText(this,s,Toast.LENGTH_SHORT).show()}
 }
@@ -164,5 +197,42 @@ private class ProgressChart(context: android.content.Context, private val points
         }
         drawSeries({it.second},0xFF16899B.toInt());drawSeries({it.third},0xFF55B78E.toInt())
         paint.color=0xFF54818B.toInt();paint.textSize=21f;points.forEachIndexed{idx,p->canvas.drawText(p.first,left+slot*(idx+.5f)-18f,h-6f,paint)}
+    }
+}
+
+
+private class IncomeChart(context: android.content.Context, private val points: List<Pair<String, Double>>) : View(context) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val w = width.toFloat(); val h = height.toFloat()
+        val left = 12f; val right = w - 8f; val top = 18f; val bottom = h - 34f
+        val maxValue = points.maxOfOrNull { it.second }?.coerceAtLeast(1.0) ?: 1.0
+        paint.color = 0xFFB7E3E1.toInt(); paint.strokeWidth = 1f
+        for (i in 0..3) {
+            val y = top + i * (bottom - top) / 3f
+            canvas.drawLine(left, y, right, y, paint)
+        }
+        if (points.isEmpty()) return
+        val slot = (right - left) / points.size
+        val path = Path()
+        points.forEachIndexed { index, point ->
+            val x = left + slot * (index + 0.5f)
+            val y = bottom - ((point.second / maxValue).toFloat() * (bottom - top))
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            paint.color = 0xFF16899B.toInt(); paint.style = Paint.Style.FILL
+            canvas.drawCircle(x, y, 4.5f, paint)
+            paint.color = 0xFF54818B.toInt(); paint.textSize = 10f
+            val label = point.first
+            canvas.drawText(label, x - paint.measureText(label) / 2f, h - 8f, paint)
+        }
+        paint.color = 0xFF16899B.toInt(); paint.strokeWidth = 3.5f
+        paint.style = Paint.Style.STROKE; paint.strokeCap = Paint.Cap.ROUND
+        canvas.drawPath(path, paint)
+        paint.style = Paint.Style.FILL
+        if (points.all { it.second == 0.0 }) {
+            paint.color = 0xFF54818B.toInt(); paint.textSize = 12f
+            canvas.drawText("Registre ganhos para visualizar sua evolução", left, (top + bottom) / 2f, paint)
+        }
     }
 }
