@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Ritmo</string>
-    <string name="widget_income_description">Saldo líquido de hoje e mini gráfico dos últimos sete dias</string>
-    <string name="widget_todo_description">Lista de tarefas pendentes com opção de concluir pela tela inicial</string>
+    <string name="app_name">LIFE.EXE</string>
+    <string name="widget_income_description">Saldo total, saldo de hoje e evolução financeira dos últimos sete dias</string>
+    <string name="widget_todo_description">Missões e tarefas pendentes com opção de concluir pela tela inicial</string>
 </resources>

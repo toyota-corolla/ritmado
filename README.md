@@ -1,70 +1,72 @@
-# LIFE.EXE — Android
+# LIFE.EXE — Discipline Protocol
 
-Sistema pessoal de execução e disciplina com identidade Cyber Core / Matrix. Aplicativo Android nativo em Java, com armazenamento local SQLite e sem dependências de bibliotecas de terceiros.
+Aplicativo Android nativo em Kotlin, atualizado sobre o projeto-base RITMO. A estrutura original, o `applicationId` (`com.ritmo.planner`), as preferências locais existentes e os providers dos widgets foram preservados. A interface foi convertida para o visual **Cyber Core / Matrix**: preto profundo, verde neon, painéis HUD, tipografia monoespaçada e navegação inferior.
+
+## Módulos
+
+- **Dashboard:** resumo financeiro, treino, missões do dia, hábitos, foco, objetivos e tarefas.
+- **Financeiro:** cadastro, edição e exclusão de receitas e despesas; saldo total, saldo do dia, evolução de sete dias e meta mensal configurável.
+- **Físico:** registro, edição e exclusão de flexões e barras, totais acumulados e gráfico de evolução.
+- **To-do:** tarefas com categoria, prioridade, prazo e horário; conclusão, edição, exclusão e identificação de atrasadas. O widget de tarefas original continua disponível.
+- **Mission Control:** missões por categoria, prioridade, dificuldade, prazo e horário; conclusão, início, adiamento com motivo e registro de abandono. Limite de três missões prioritárias ativas por dia.
+- **Habit System:** frequência diária, dias úteis ou semanal; meta normal e mínima; lembretes locais; calendário de 28 dias; sequência atual, melhor sequência e consistência.
+- **Focus Mode:** sessões de 5, 25, 45 ou 60 minutos, com pausar, retomar, concluir e cancelar. O tempo é baseado em timestamps persistidos e é recuperado ao abrir o app novamente.
+- **Anti-Procrastination Protocol:** motivos de evitação, resistência de 1 a 10, primeira ação recomendada e histórico de enfrentamento.
+- **Projeto Liberdade:** objetivos, descrição, edição, etapas, conclusão e progresso percentual; diário de avanços mantido.
+- **XP e conquistas:** pontuação por ações, histórico, níveis e conquistas por metas reais registradas.
+- **Analytics:** produtividade, hábitos, foco, finanças, físico, procrastinação, taxa de enfrentamento, recomendações e snapshots de relatórios semanais.
+- **Configurações:** metas pessoais, notificações locais, exportação e restauração de backup JSON.
+- **Widgets:** saldo e tarefas na tela inicial, mantidos a partir do projeto original e reestilizados com a identidade LIFE.EXE.
+
+## Compatibilidade e persistência
+
+- Android Gradle Plugin 8.7.3
+- Gradle 8.9
+- Kotlin 2.0.21
+- JDK 17
+- compileSdk / targetSdk 35
+- minSdk 26 (Android 8.0)
+- `applicationId`: `com.ritmo.planner` (preservado para manter a identidade do app-base)
+- `versionCode`: 7 / `versionName`: 7.0
+- Sem conta, servidor ou dependência de conexão para usar as funções locais.
+
+Os dados originais em `SharedPreferences` continuam usando as chaves `income`, `expenses`, `todos`, `workouts` e `social`. Os novos módulos usam novas chaves no mesmo arquivo de preferências `ritmo_data`; não há migração destrutiva das chaves antigas. O backup JSON inclui as preferências do app, inclusive os dados novos.
+
+**Atualização da instalação existente:** o package ID foi mantido. Para instalar por cima da versão atual sem desinstalar, o APK novo também precisa estar assinado com a mesma chave do APK instalado. APKs debug assinados por máquinas/ambientes diferentes podem usar chaves diferentes; nesse caso, o Android pode recusar a atualização. Antes de reinstalar ou trocar de aparelho, exporte um backup em Configurações.
 
 ## Compilar pelo GitHub Actions
 
-1. Crie um repositório no GitHub e envie o conteúdo desta pasta para a branch `main` (ou `master`).
-2. Abra **Actions** no repositório. O workflow **Android CI** executa automaticamente em push, pull request e também pode ser iniciado manualmente.
-3. Quando a execução terminar com sucesso, abra a execução e baixe o artefato **LIFE-EXE-debug-apk**. O arquivo gerado é `app-debug.apk`.
+1. Crie um repositório GitHub vazio.
+2. Extraia este ZIP e envie **todo o conteúdo da pasta** (a pasta `app`, `.github`, `gradle`, `gradlew`, `settings.gradle.kts` etc.) para a raiz do repositório.
+3. Faça commit na branch `main`.
+4. Abra a aba **Actions** e selecione **LIFE.EXE Android CI**.
+5. A execução também começa automaticamente a cada push na branch `main`; para iniciar manualmente, use **Run workflow**.
+6. Quando terminar, abra a execução e baixe o artefato **`life-exe-debug-apk`**.
+7. Extraia o artefato e instale `app-debug.apk` no Android.
 
-O workflow instala JDK 17, Android SDK Platform 35 e Build Tools 35.0.0, executa `./gradlew --no-daemon assembleDebug` e publica o APK como artefato por 14 dias.
-
-## Compilar localmente
-
-Requisitos: JDK 17, conexão com a internet na primeira execução e Android SDK Platform 35 / Build Tools 35.0.0.
+O workflow instala Java 17 e Android SDK 35, prepara o Gradle Wrapper e executa. A versão do app foi incrementada para 7.0, mantendo o mesmo `applicationId`:
 
 ```bash
 ./gradlew --no-daemon assembleDebug
 ```
 
-O APK fica em:
+## Compilar localmente (opcional)
 
-```text
-app/build/outputs/apk/debug/app-debug.apk
+Com JDK 17 e Android SDK 35 instalados, na raiz do projeto execute:
+
+```bash
+./gradlew --no-daemon assembleDebug
 ```
 
-`gradlew` e `gradlew.bat` são scripts de bootstrap que baixam e usam a distribuição Gradle 8.9 indicada em `gradle/wrapper/gradle-wrapper.properties`. Assim, não é necessário ter Gradle instalado globalmente.
+O APK será gerado em `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Funcionalidades incluídas
+## Widgets
 
-- **Dashboard:** saldo total e diário, receitas/despesas, flexões, barras, objetivos, missões prioritárias, tarefas e resumo de disciplina.
-- **Mission Control / To-do:** cadastro, edição, exclusão, conclusão com XP, prioridade, dificuldade, prazo e adiamento com justificativa.
-- **Habit System:** hábitos, meta normal e mínima, frequência, registros diários e contagem de dias registrados sem apagar o histórico após uma falha.
-- **Focus Mode:** sessões de 5, 25, 45 ou 60 minutos, tarefa vinculada, pausa, retomada, cancelamento e registro de sessões concluídas.
-- **Anti-Procrastination:** registro da tarefa evitada, motivo, resistência de 1 a 10 e primeira ação concreta; início do protocolo concede XP.
-- **Projeto Liberdade:** objetivos com alvo numérico, progresso e registro de avanços.
-- **Finanças e corpo:** lançamentos de receita/despesa e registros de flexões/barras, com edição e exclusão.
-- **XP e conquistas:** ledger de XP, nível calculado, histórico e medalhas baseadas em marcos registrados.
-- **Analytics e relatório semanal:** indicadores agregados, taxa de enfrentamento operacional e relatório compartilhável com dados dos últimos sete dias.
-- **Backup:** exportação e restauração de JSON via seletor de arquivos Android; a restauração pede confirmação antes de substituir os dados locais.
+1. Instale o APK.
+2. Toque e segure uma área vazia da tela inicial do Android.
+3. Abra **Widgets** e procure **LIFE.EXE**.
+4. Adicione **Saldo — LIFE.EXE** (2×1) ou **Tarefas — LIFE.EXE** (2×2).
 
-## Persistência e privacidade
+## Observações de validação
 
-Os dados operacionais ficam no banco SQLite privado do aplicativo. O app não exige conta, login, conexão com servidor ou permissões de rede. Use **Configurações → Exportar backup JSON** para manter uma cópia externa dos registros.
-
-## Estrutura
-
-```text
-.
-├── .github/workflows/android.yml
-├── app/
-│   ├── build.gradle
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── java/com/lifeexe/app/MainActivity.java
-│       ├── java/com/lifeexe/app/data/DatabaseHelper.java
-│       └── res/values/styles.xml
-├── gradle/wrapper/gradle-wrapper.properties
-├── gradlew
-├── gradlew.bat
-├── build.gradle
-└── settings.gradle
-```
-
-## Observações da versão 2.0 inicial
-
-- A aplicação usa SQLite local. Sincronização entre dispositivos e conta online não fazem parte desta entrega.
-- Lembretes/notificações agendadas, calendário visual de hábitos e gráficos históricos com séries temporais ainda não estão implementados; os indicadores disponíveis são calculados a partir dos registros reais.
-- O cronômetro de foco mantém a sessão em memória enquanto a atividade está aberta; uma sessão é gravada no histórico ao ser concluída. Fechar o processo durante uma sessão não restaura o cronômetro automaticamente.
-- A validação de compilação deve ser confirmada no GitHub Actions. O ambiente em que este projeto foi preparado não contém Android SDK e não tem acesso à rede para baixar o Gradle, portanto nenhum APK foi gerado localmente nesta sessão.
+O projeto mantém o Gradle Wrapper e o workflow configurados. Neste ambiente de edição não há Android SDK instalado e a conexão a `services.gradle.org` está indisponível; por isso, a compilação real do APK deve ser confirmada no runner do GitHub Actions. XMLs, arquivos de configuração e estrutura do workflow podem ser verificados localmente antes do push, mas isso não substitui a compilação Android no CI.

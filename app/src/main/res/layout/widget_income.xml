@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="SALDO TOTAL"
-            android:textColor="#5E9879"
+            android:textColor="#70A98A"
             android:textSize="9sp"
             android:textStyle="bold"
             android:letterSpacing="0.06" />
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="R$ 0,00"
-            android:textColor="#B9FFD9"
+            android:textColor="#D8FFE8"
             android:textSize="17sp"
             android:textStyle="bold"
             android:maxLines="1"
@@ -40,7 +40,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:text="Hoje: R$ 0,00"
-            android:textColor="#5E9879"
+            android:textColor="#70A98A"
             android:textSize="9sp"
             android:maxLines="1" />
     </LinearLayout>
