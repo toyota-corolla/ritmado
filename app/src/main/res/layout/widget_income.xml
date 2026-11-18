@@ -5,50 +5,77 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingStart="5dp"
-    android:paddingEnd="3dp"
-    android:paddingTop="3dp"
-    android:paddingBottom="3dp"
+    android:paddingStart="11dp"
+    android:paddingEnd="9dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:background="@drawable/widget_income_bg">
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="SALDO TOTAL"
-            android:textColor="#70A98A"
+            android:text="SALDO LÍQUIDO"
+            android:textColor="#91BBA5"
             android:textSize="9sp"
             android:textStyle="bold"
-            android:letterSpacing="0.06" />
+            android:letterSpacing="0.09"
+            android:includeFontPadding="false" />
+
         <TextView
             android:id="@+id/widget_income_total"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="4dp"
             android:text="R$ 0,00"
-            android:textColor="#D8FFE8"
+            android:textColor="#E2FFEE"
             android:textSize="17sp"
             android:textStyle="bold"
             android:maxLines="1"
+            android:ellipsize="end"
             android:includeFontPadding="false" />
+
         <TextView
             android:id="@+id/widget_income_today"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="4dp"
             android:text="Hoje: R$ 0,00"
-            android:textColor="#70A98A"
+            android:textColor="#A0C7B0"
             android:textSize="9sp"
-            android:maxLines="1" />
+            android:maxLines="1"
+            android:includeFontPadding="false" />
     </LinearLayout>
-    <ImageView
-        android:id="@+id/widget_income_chart"
-        android:layout_width="66dp"
-        android:layout_height="32dp"
-        android:layout_marginStart="3dp"
-        android:contentDescription="Mini gráfico do saldo líquido dos últimos sete dias"
-        android:scaleType="fitCenter" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal|center_vertical"
+        android:layout_marginStart="7dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="7 DIAS"
+            android:textColor="#759B86"
+            android:textSize="8sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08"
+            android:includeFontPadding="false" />
+
+        <ImageView
+            android:id="@+id/widget_income_chart"
+            android:layout_width="66dp"
+            android:layout_height="31dp"
+            android:layout_marginTop="3dp"
+            android:contentDescription="Mini gráfico do saldo líquido dos últimos sete dias"
+            android:scaleType="fitCenter" />
+    </LinearLayout>
 </LinearLayout>

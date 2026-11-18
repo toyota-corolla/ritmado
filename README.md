@@ -16,7 +16,7 @@ Aplicativo Android nativo em Kotlin, atualizado sobre o projeto-base RITMO. A es
 - **XP e conquistas:** pontuação por ações, histórico, níveis e conquistas por metas reais registradas.
 - **Analytics:** produtividade, hábitos, foco, finanças, físico, procrastinação, taxa de enfrentamento, recomendações e snapshots de relatórios semanais.
 - **Configurações:** metas pessoais, notificações locais, exportação e restauração de backup JSON.
-- **Widgets:** saldo e tarefas na tela inicial, mantidos a partir do projeto original e reestilizados com a identidade LIFE.EXE.
+- **Widgets:** saldo e tarefas na tela inicial, com dimensões mínimas reduzidas, linhas compactas, contagem em destaque e fundo escuro translúcido com borda verde discreta.
 
 ## Compatibilidade e persistência
 
@@ -27,7 +27,7 @@ Aplicativo Android nativo em Kotlin, atualizado sobre o projeto-base RITMO. A es
 - compileSdk / targetSdk 35
 - minSdk 26 (Android 8.0)
 - `applicationId`: `com.ritmo.planner` (preservado para manter a identidade do app-base)
-- `versionCode`: 7 / `versionName`: 7.0
+- `versionCode`: 8 / `versionName`: 7.1
 - Sem conta, servidor ou dependência de conexão para usar as funções locais.
 
 Os dados originais em `SharedPreferences` continuam usando as chaves `income`, `expenses`, `todos`, `workouts` e `social`. Os novos módulos usam novas chaves no mesmo arquivo de preferências `ritmo_data`; não há migração destrutiva das chaves antigas. O backup JSON inclui as preferências do app, inclusive os dados novos.
@@ -44,7 +44,7 @@ Os dados originais em `SharedPreferences` continuam usando as chaves `income`, `
 6. Quando terminar, abra a execução e baixe o artefato **`life-exe-debug-apk`**.
 7. Extraia o artefato e instale `app-debug.apk` no Android.
 
-O workflow instala Java 17 e Android SDK 35, prepara o Gradle Wrapper e executa. A versão do app foi incrementada para 7.0, mantendo o mesmo `applicationId`:
+O workflow instala Java 17 e Android SDK 35, prepara o Gradle Wrapper e executa. A versão do app foi incrementada para 7.1, mantendo o mesmo `applicationId`:
 
 ```bash
 ./gradlew --no-daemon assembleDebug

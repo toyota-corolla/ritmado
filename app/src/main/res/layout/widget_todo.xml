@@ -4,37 +4,133 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="6dp"
+    android:gravity="center_vertical"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:background="@drawable/widget_income_bg">
-    <TextView
+
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="LIFE.EXE  /  MISSÕES"
-        android:textColor="#70A98A"
-        android:textSize="9sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.06" />
+        android:layout_height="18dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="LIFE.EXE  /  MISSÕES"
+            android:textColor="#91BBA5"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.07"
+            android:includeFontPadding="false" />
+
+        <TextView
+            android:id="@+id/widget_todo_count"
+            android:layout_width="wrap_content"
+            android:layout_height="17dp"
+            android:gravity="center"
+            android:paddingStart="7dp"
+            android:paddingEnd="7dp"
+            android:background="@drawable/widget_badge_bg"
+            android:text="0 ATIVAS"
+            android:textColor="#B9F5D0"
+            android:textSize="8sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false" />
+    </LinearLayout>
+
     <TextView
-        android:id="@+id/widget_todo_count"
+        android:id="@+id/widget_todo_empty"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="0 pendente(s)"
-        android:textColor="#D8FFE8"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:paddingTop="1dp"
-        android:paddingBottom="2dp" />
-    <TextView android:id="@+id/widget_todo_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Tudo em dia" android:textColor="#70A98A" android:textSize="11sp" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/todo_check_1" android:layout_width="24dp" android:layout_height="28dp" android:gravity="center" android:text="○" android:textColor="#00FF88" android:textSize="17sp" />
-        <TextView android:id="@+id/todo_line_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:ellipsize="end" android:textColor="#D8FFE8" android:textSize="11sp" />
+        android:layout_height="20dp"
+        android:gravity="center_vertical"
+        android:text="Tudo em dia  ·  bom trabalho"
+        android:textColor="#A0C7B0"
+        android:textSize="10sp"
+        android:includeFontPadding="false" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:id="@+id/todo_row_1">
+        <TextView
+            android:id="@+id/todo_check_1"
+            android:layout_width="23dp"
+            android:layout_height="20dp"
+            android:gravity="center"
+            android:text="○"
+            android:textColor="#45E89A"
+            android:textSize="15sp"
+            android:includeFontPadding="false" />
+        <TextView
+            android:id="@+id/todo_line_1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#E0F7E9"
+            android:textSize="10sp"
+            android:includeFontPadding="false" />
     </LinearLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/todo_check_2" android:layout_width="24dp" android:layout_height="28dp" android:gravity="center" android:text="○" android:textColor="#00FF88" android:textSize="17sp" />
-        <TextView android:id="@+id/todo_line_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:ellipsize="end" android:textColor="#D8FFE8" android:textSize="11sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:id="@+id/todo_row_2">
+        <TextView
+            android:id="@+id/todo_check_2"
+            android:layout_width="23dp"
+            android:layout_height="20dp"
+            android:gravity="center"
+            android:text="○"
+            android:textColor="#45E89A"
+            android:textSize="15sp"
+            android:includeFontPadding="false" />
+        <TextView
+            android:id="@+id/todo_line_2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#E0F7E9"
+            android:textSize="10sp"
+            android:includeFontPadding="false" />
     </LinearLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/todo_check_3" android:layout_width="24dp" android:layout_height="28dp" android:gravity="center" android:text="○" android:textColor="#00FF88" android:textSize="17sp" />
-        <TextView android:id="@+id/todo_line_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:maxLines="1" android:ellipsize="end" android:textColor="#D8FFE8" android:textSize="11sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:id="@+id/todo_row_3">
+        <TextView
+            android:id="@+id/todo_check_3"
+            android:layout_width="23dp"
+            android:layout_height="20dp"
+            android:gravity="center"
+            android:text="○"
+            android:textColor="#45E89A"
+            android:textSize="15sp"
+            android:includeFontPadding="false" />
+        <TextView
+            android:id="@+id/todo_line_3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#E0F7E9"
+            android:textSize="10sp"
+            android:includeFontPadding="false" />
     </LinearLayout>
 </LinearLayout>
