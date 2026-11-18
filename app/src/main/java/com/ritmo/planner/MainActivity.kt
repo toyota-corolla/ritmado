@@ -35,88 +35,158 @@ class MainActivity : Activity() {
     private fun showPage(target: String) {
         page = target
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(BG) }
-        val scroll = ScrollView(this)
-        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 18, 20, 18) }
+        val scroll = ScrollView(this).apply { isFillViewport = true }
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(10, 10, 10, 14) }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(4,8,4,8); setBackgroundColor(0xFF030D08.toInt()) }
-        listOf("home" to "INÍCIO", "money" to "DINHEIRO", "body" to "FÍSICO", "social" to "SOCIAL", "todo" to "TAREFAS").forEach { (key,label) ->
-            val button = Button(this).apply { text = label; textSize = 9f; isAllCaps = false; setTextColor(if (page==key) 0xFF001B0D.toInt() else INK); background = pill(if(page==key) AQUA else PANEL); setPadding(2,0,2,0); setOnClickListener { showPage(key) } }
-            nav.addView(button, LinearLayout.LayoutParams(0, 46, 1f).apply { setMargins(2,0,2,0) })
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(3, 7, 3, 7)
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFF020A06.toInt()); setStroke(1, 0xFF12683D.toInt()) }
         }
+        nav.addView(navButton("home", "⌂\nInício"), LinearLayout.LayoutParams(0, 58, 1f))
+        nav.addView(navButton("body", "▥\nEstatísticas"), LinearLayout.LayoutParams(0, 58, 1f))
+        val add = TextView(this).apply {
+            text = "+"; textSize = 36f; gravity = Gravity.CENTER; setTextColor(AQUA)
+            background = neonPanel(0xFF04150C.toInt(), 0xFF19F58A.toInt(), 3)
+            setOnClickListener { showQuickAdd() }
+        }
+        nav.addView(add, LinearLayout.LayoutParams(58, 58).apply { setMargins(4, 0, 4, 0) })
+        nav.addView(navButton("social", "♜\nConquistas"), LinearLayout.LayoutParams(0, 58, 1f))
+        nav.addView(navButton("settings", "⚙\nConfig."), LinearLayout.LayoutParams(0, 58, 1f))
         root.addView(nav)
         setContentView(root)
-        when(target) { "money" -> moneyPage(body); "body" -> bodyPage(body); "social" -> socialPage(body); "todo" -> todoPage(body); else -> homePage(body) }
+        when(target) {
+            "money" -> moneyPage(body)
+            "body" -> bodyPage(body)
+            "social" -> socialPage(body)
+            "todo" -> todoPage(body)
+            "settings" -> settingsPage(body)
+            else -> homePage(body)
+        }
+    }
+
+    private fun navButton(target:String, caption:String) = TextView(this).apply {
+        text = caption; gravity = Gravity.CENTER; textSize = 10f
+        setTextColor(if(page==target) AQUA else MUTED)
+        setOnClickListener { showPage(target) }
+    }
+
+    private fun showQuickAdd() {
+        val options = arrayOf("Registrar receita ou gasto", "Registrar treino", "Adicionar tarefa", "Registrar avanço")
+        android.app.AlertDialog.Builder(this).setTitle("NOVO REGISTRO").setItems(options) { _, which ->
+            when(which) { 0 -> showPage("money"); 1 -> showPage("body"); 2 -> showPage("todo"); 3 -> showPage("social") }
+        }.show()
+    }
+
+    private fun settingsPage(b:LinearLayout) {
+        header(b, "05 / SISTEMA", "Configurações")
+        card(b) {
+            addView(label("LIFE.EXE", 22, AQUA, true))
+            addView(label("Planeje. Registre. Evolua.", 13, MUTED))
+            addView(label("Seus registros são armazenados localmente neste dispositivo.", 12, INK))
+        }
+        action(b, "VOLTAR AO INÍCIO") { showPage("home") }
     }
 
     private fun homePage(b: LinearLayout) {
-        b.addView(label("◉ ONLINE     LIFE.EXE", 12, AQUA, true))
-        b.addView(label("PLANEJE. REGISTRE. EVOLUA.", 23, INK, true))
-        b.addView(label("PAINEL PESSOAL  /  $prettyDate", 10, MUTED, true))
+        val headerRow = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(4, 5, 4, 10) }
+        headerRow.addView(label("◎", 48, AQUA, true), LinearLayout.LayoutParams(66, 66))
+        val brand = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL }
+        brand.addView(label("LIFE.EXE", 25, AQUA, true))
+        brand.addView(label("PLANEJE. REGISTRE. EVOLUA.", 10, MUTED, true))
+        headerRow.addView(brand, LinearLayout.LayoutParams(0,-2,1f))
+        headerRow.addView(label("● ONLINE", 10, AQUA, true))
+        b.addView(headerRow)
 
         val balance = totalIncome() - totalExpenses()
         val today = todayNet()
         val finance = lastSevenDaysNet()
         val financeTrend = if (finance.size >= 2) finance.last().second - finance.first().second else 0.0
-        card(b) {
-            addView(label("▣  SALDO TOTAL", 12, AQUA, true))
-            addView(label("R$ ${money(balance)}", 29, INK, true))
-            addView(label("${if(balance >= 0) "▲" else "▼"}  ${if(balance >= 0) "Saldo positivo" else "Saldo negativo"}", 11, if(balance >= 0) AQUA else 0xFFFF6B6B.toInt(), true))
+        val moneyRow = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        dashboardCard(moneyRow, 1f) {
+            addView(label("▣  SALDO TOTAL", 11, AQUA, true))
+            addView(label("R$ ${money(balance)}", 21, INK, true))
+            addView(label("${if(balance>=0) "▲" else "▼"} ${if(balance>=0) "POSITIVO" else "NEGATIVO"}", 10, if(balance>=0) AQUA else 0xFFFF6B6B.toInt(), true))
+            addView(IncomeChart(this@MainActivity, finance).apply { layoutParams=LinearLayout.LayoutParams(-1,42) })
         }
-        card(b) {
-            addView(label("▦  SALDO DE HOJE", 12, AQUA, true))
-            addView(label("R$ ${money(today)}", 27, INK, true))
-            addView(label("Entradas  R$ ${money(todayIncome())}    /    Saídas  R$ ${money(todayExpenses())}", 11, MUTED))
+        dashboardCard(moneyRow, 1f) {
+            addView(label("▦  SALDO DE HOJE", 11, AQUA, true))
+            addView(label("R$ ${money(today)}", 21, INK, true))
+            addView(label("${if(today>=0) "▲" else "▼"} ENTRADAS − SAÍDAS", 9, if(today>=0) AQUA else 0xFFFF6B6B.toInt(), true))
+            addView(IncomeChart(this@MainActivity, finance).apply { layoutParams=LinearLayout.LayoutParams(-1,42) })
         }
-        card(b) {
-            addView(label("⌁  EVOLUÇÃO FINANCEIRA  /  7 DIAS", 12, AQUA, true))
-            addView(label("${if(financeTrend >= 0) "▲" else "▼"}  Variação no período: R$ ${money(kotlin.math.abs(financeTrend))}", 11, if(financeTrend >= 0) AQUA else 0xFFFF6B6B.toInt(), true))
-            addView(IncomeChart(this@MainActivity, finance).apply { layoutParams = LinearLayout.LayoutParams(-1, 155).apply { setMargins(0, 4, 0, 0) } })
-        }
+        b.addView(moneyRow)
 
+        val metricsRow = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.TOP }
         val exercises = todayExercise()
         val totals = allExerciseTotals()
         val workoutTrend = workoutDirection()
-        card(b) {
-            addView(label("▥  SEU DESEMPENHO", 12, AQUA, true))
-            val line = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-            val left = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(4,8,4,4) }
-            left.addView(label("FLEXÕES", 11, MUTED, true)); left.addView(label("${totals.first}", 28, INK, true)); left.addView(label("Hoje: ${exercises.first}", 11, MUTED))
-            val right = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(18,8,4,4) }
-            right.addView(label("BARRAS", 11, MUTED, true)); right.addView(label("${totals.second}", 28, INK, true)); right.addView(label("Hoje: ${exercises.second}", 11, MUTED))
-            line.addView(left, LinearLayout.LayoutParams(0,-2,1f)); line.addView(View(this@MainActivity).apply { setBackgroundColor(GRID) }, LinearLayout.LayoutParams(1,95)); line.addView(right, LinearLayout.LayoutParams(0,-2,1f)); addView(line)
-            addView(label("${workoutTrend.first}  ${workoutTrend.second}", 12, if(workoutTrend.first.contains("MELHORANDO")) AQUA else if(workoutTrend.first.contains("PIORANDO")) 0xFFFF6B6B.toInt() else MUTED, true))
-            addView(label("Totais acumulados desde o primeiro registro", 10, MUTED))
+        dashboardCard(metricsRow, 1f) {
+            addView(label("▥  DESEMPENHO", 11, AQUA, true))
+            addView(label("FLEXÕES", 10, MUTED, true))
+            addView(label("${totals.first}", 27, INK, true))
+            addView(label("Hoje: ${exercises.first}", 10, MUTED))
+            addView(View(this@MainActivity).apply { setBackgroundColor(GRID) }, LinearLayout.LayoutParams(-1,1).apply { setMargins(0,5,0,5) })
+            addView(label("BARRAS", 10, MUTED, true))
+            addView(label("${totals.second}", 27, INK, true))
+            addView(label("Hoje: ${exercises.second}", 10, MUTED))
+            addView(label(workoutTrend.first, 10, if(workoutTrend.first.contains("MELHORANDO")) AQUA else if(workoutTrend.first.contains("PIORANDO")) 0xFFFF6B6B.toInt() else MUTED, true))
         }
+        dashboardCard(metricsRow, 1f) {
+            addView(label("⌁  EVOLUÇÃO FINANCEIRA", 11, AQUA, true))
+            addView(label("ÚLTIMOS 7 DIAS", 9, MUTED, true))
+            addView(IncomeChart(this@MainActivity, finance).apply { layoutParams=LinearLayout.LayoutParams(-1,150) })
+            addView(label("Variação: R$ ${money(kotlin.math.abs(financeTrend))}", 10, if(financeTrend>=0) AQUA else 0xFFFF6B6B.toInt(), true))
+        }
+        b.addView(metricsRow)
 
         val advances = readArray("social")
         card(b) {
-            addView(label("⌁  PROJETO LIBERDADE", 13, AQUA, true))
-            addView(label("Construindo uma vida livre.", 14, MUTED))
-            addView(label("${advances.length()} avanços registrados", 20, INK, true))
+            addView(label("›  PROJETO LIBERDADE", 14, AQUA, true))
+            addView(label("Construindo uma vida livre.", 12, MUTED))
+            val divider = View(this@MainActivity).apply { setBackgroundColor(0xFF17683D.toInt()) }
+            addView(divider, LinearLayout.LayoutParams(-1,1).apply { setMargins(0,3,0,7) })
+            addView(label("${advances.length()} AVANÇOS REGISTRADOS", 12, INK, true))
             val from = maxOf(0, advances.length()-2)
             for(i in advances.length()-1 downTo from) {
-                val item = advances.optJSONObject(i) ?: continue
-                addView(label("✓  ${item.optString("title")}  •  ${item.optString("date")}", 12, INK))
+                val item=advances.optJSONObject(i) ?: continue
+                addView(label("✓  ${item.optString("title")}  •  ${item.optString("date")}", 11, INK))
             }
-            if(advances.length()==0) addView(label("Registre pequenas vitórias e próximos passos na área Projeto Liberdade.", 11, MUTED))
+            if(advances.length()==0) addView(label("Registre suas conquistas e próximos passos para acompanhar sua evolução.", 11, MUTED))
             action(this, "＋  REGISTRAR AVANÇO") { showPage("social") }
         }
 
         val pending = pendingTodos()
         card(b) {
-            addView(label("☑  TO DO LIST", 13, AQUA, true))
-            addView(label("${pending.length()} TAREFA(S) PENDENTE(S)", 10, MUTED, true))
+            val titleRow=LinearLayout(this@MainActivity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
+            titleRow.addView(label("☑  TO DO LIST", 14, AQUA, true), LinearLayout.LayoutParams(0,-2,1f))
+            titleRow.addView(label("${pending.length()} PENDENTES", 9, AQUA, true))
+            addView(titleRow)
+            addView(View(this@MainActivity).apply { setBackgroundColor(0xFF17683D.toInt()) }, LinearLayout.LayoutParams(-1,1).apply { setMargins(0,2,0,6) })
             for(i in 0 until minOf(3,pending.length())) {
-                val task = pending.optJSONObject(i) ?: continue
-                addView(label("□  ${task.optString("title")}", 13, INK))
+                val task=pending.optJSONObject(i) ?: continue
+                val line=LinearLayout(this@MainActivity).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(0,3,0,3) }
+                val taskCheck=CheckBox(this@MainActivity).apply {
+                    isChecked=false
+                    buttonTintList=android.content.res.ColorStateList.valueOf(AQUA)
+                    setOnCheckedChangeListener { _, checked ->
+                        if(checked) {
+                            val all=readArray("todos")
+                            for(j in 0 until all.length()) { val entry=all.optJSONObject(j) ?: continue; if(entry.optString("id")==task.optString("id")) entry.put("done",true) }
+                            saveArray("todos",all); TodoWidgetProvider.refreshAll(this@MainActivity); showPage("home")
+                        }
+                    }
+                }
+                line.addView(taskCheck, LinearLayout.LayoutParams(34,42))
+                line.addView(label(task.optString("title"), 12, INK), LinearLayout.LayoutParams(0,-2,1f))
+                line.addView(label("PENDENTE", 8, AQUA, true))
+                addView(line)
+                if(i<minOf(3,pending.length())-1) addView(View(this@MainActivity).apply { setBackgroundColor(0xFF123D29.toInt()) }, LinearLayout.LayoutParams(-1,1))
             }
             if(pending.length()==0) addView(label("Nenhuma tarefa pendente.", 12, MUTED))
             action(this, "＋  GERENCIAR TAREFAS") { showPage("todo") }
         }
-        b.addView(label("ATALHOS DO SISTEMA", 11, MUTED, true))
-        action(b, "＋  REGISTRAR RECEITA OU GASTO") { showPage("money") }
-        action(b, "＋  REGISTRAR TREINO") { showPage("body") }
+        action(b, "＋  REGISTRO RÁPIDO") { showQuickAdd() }
     }
 
     private fun workoutDirection(): Pair<String,String> {
@@ -315,8 +385,27 @@ class MainActivity : Activity() {
     private fun refreshWidgets() { IncomeWidgetProvider.refreshAll(this); TodoWidgetProvider.refreshAll(this) }
     private fun parseAmount(raw:String):Double? = raw.trim().replace("R$","").replace(" ","").let { if(it.contains(",")) it.replace(".","").replace(",",".").toDoubleOrNull() else it.toDoubleOrNull() }
     private fun header(b:LinearLayout,tag:String,title:String){ b.addView(label(tag,12,MUTED,true)); b.addView(label(title,29,INK,true)) }
-    private fun label(s:String,size:Int,color:Int,bold:Boolean=false)=TextView(this).apply { text=s; textSize=size.toFloat(); setTextColor(color); if(bold)setTypeface(typeface, android.graphics.Typeface.BOLD); setPadding(0,5,0,7) }
+    private fun label(s:String,size:Int,color:Int,bold:Boolean=false)=TextView(this).apply {
+        text=s; textSize=size.toFloat(); setTextColor(color)
+        typeface=android.graphics.Typeface.MONOSPACE
+        if(bold) setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+        if(color==AQUA) setShadowLayer(7f,0f,0f,0xAA19F58A.toInt())
+        setPadding(0,5,0,7)
+    }
     private fun pill(color:Int)=android.graphics.drawable.GradientDrawable().apply { setColor(color); cornerRadius=22f }
+    private fun neonPanel(fill:Int, stroke:Int, strokeWidth:Int=1)=android.graphics.drawable.GradientDrawable().apply {
+        setColor(fill); cornerRadius=9f; setStroke(strokeWidth,stroke)
+    }
+    private fun dashboardCard(parent:LinearLayout, weight:Float, content:LinearLayout.()->Unit) {
+        val box=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL; setPadding(10,10,10,9)
+            background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF071A10.toInt(),0xFF020A06.toInt())).apply { cornerRadius=8f; setStroke(1,0xFF16834A.toInt()) }
+            elevation=3f
+            content()
+        }
+        parent.addView(box, LinearLayout.LayoutParams(0,-2,weight).apply { setMargins(4,5,4,5) })
+    }
     private fun card(parent:LinearLayout, content:LinearLayout.()->Unit) { val box=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(16,13,16,13); background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,intArrayOf(0xFF0B1D13.toInt(),0xFF041009.toInt())).apply { cornerRadius=7f; setStroke(1,0xFF167747.toInt()) }; content() }; parent.addView(box,LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,8,0,8)}) }
     private fun field(hint:String,numeric:Boolean,multi:Boolean=false)=EditText(this).apply { this.hint=hint; textSize=14f; setTextColor(INK); setHintTextColor(MUTED); inputType=if(numeric) (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL) else (InputType.TYPE_CLASS_TEXT or (if(multi) InputType.TYPE_TEXT_FLAG_MULTI_LINE else 0)); if(multi){minLines=3;gravity=Gravity.TOP}; setPadding(14,12,14,12); background=pill(0xFF0B1B12.toInt()); layoutParams=LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,6,0,6)} }
     private fun action(parent:LinearLayout,text:String,onClick:()->Unit){ val btn=Button(this).apply{this.text=text; textSize=13f; setTextColor(0xFF001B0D.toInt()); background=pill(AQUA); setOnClickListener{onClick()} }; parent.addView(btn,LinearLayout.LayoutParams(-1,52).apply{setMargins(0,6,0,6)}) }
