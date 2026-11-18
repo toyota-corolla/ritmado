@@ -49,7 +49,7 @@ class IncomeWidgetProvider : AppWidgetProvider() {
             val width=220;val height=90;val bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);val canvas=Canvas(bitmap)
             val line=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xFF19F58A.toInt();style=Paint.Style.STROKE;strokeWidth=6f;strokeCap=Paint.Cap.ROUND;strokeJoin=Paint.Join.ROUND}
             val dot=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xFF19F58A.toInt();style=Paint.Style.FILL}
-            val guide=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xFF123D29;strokeWidth=1.5f}
+            val guide=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0xFF123D29.toInt();strokeWidth=1.5f}
             val left=5f;val right=width-5f;val top=8f;val bottom=height-8f;canvas.drawLine(left,(top+bottom)/2,right,(top+bottom)/2,guide)
             val max=(values.maxOfOrNull{kotlin.math.abs(it)}?:0.0).coerceAtLeast(1.0);val path=Path()
             val coords=values.mapIndexed{index,value->val x=left+(right-left)*index/(values.size-1).coerceAtLeast(1);val y=(top+bottom)/2-((value/max).toFloat()*(bottom-top)/2);x to y}
