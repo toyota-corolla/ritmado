@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="5dp"
+    android:paddingEnd="3dp"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp"
+    android:background="@drawable/widget_income_bg">
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SALDO TOTAL"
+            android:textColor="#5E9879"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+        <TextView
+            android:id="@+id/widget_income_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="R$ 0,00"
+            android:textColor="#B9FFD9"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:includeFontPadding="false" />
+        <TextView
+            android:id="@+id/widget_income_today"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Hoje: R$ 0,00"
+            android:textColor="#5E9879"
+            android:textSize="9sp"
+            android:maxLines="1" />
+    </LinearLayout>
+    <ImageView
+        android:id="@+id/widget_income_chart"
+        android:layout_width="66dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="3dp"
+        android:contentDescription="Mini gráfico do saldo líquido dos últimos sete dias"
+        android:scaleType="fitCenter" />
+</LinearLayout>
