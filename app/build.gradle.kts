@@ -11,8 +11,8 @@ android {
         applicationId = "com.ritmo.planner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "7.5"
+        versionCode = 13
+        versionName = "7.6"
     }
     signingConfigs {
         create("stableDebug") {

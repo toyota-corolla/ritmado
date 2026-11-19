@@ -200,7 +200,9 @@ class MainActivity : Activity() {
         card(b) {
             addView(label("⌁  EVOLUÇÃO DO PATRIMÔNIO  /  MÊS ATUAL", 11, AQUA, true))
             addView(label("${if (financeTrend >= 0) "▲" else "▼"} ${if (financeTrend >= 0) "EM ALTA" else "EM QUEDA"}  •  R$ ${money(kotlin.math.abs(financeTrend))} no período", 11, if (financeTrend >= 0) AQUA else DANGER, true))
-            addView(IncomeChart(this@MainActivity, finance).apply { layoutParams = LinearLayout.LayoutParams(-1, 125) })
+            addView(IncomeChart(this@MainActivity, finance).apply {
+                layoutParams = LinearLayout.LayoutParams(-1, (142 * resources.displayMetrics.density).toInt())
+            })
             action(this, "ABRIR FINANCEIRO  ↗", AQUA) { showPage("money") }
         }
 
@@ -1254,7 +1256,7 @@ class MainActivity : Activity() {
         b.addView(label("EVOLUÇÃO FINANCEIRA / 7 DIAS", 12, AQUA, true))
         val finance = lastSevenDaysNet()
         if (readArray("income").length() + readArray("expenses").length() == 0) b.addView(label("Sem dados financeiros para gerar gráfico.", 10, MUTED))
-        else b.addView(IncomeChart(this, finance).apply { layoutParams = LinearLayout.LayoutParams(-1, 150) })
+        else b.addView(IncomeChart(this, finance).apply { layoutParams = LinearLayout.LayoutParams(-1, (142 * resources.displayMetrics.density).toInt()) })
         b.addView(label("EVOLUÇÃO FÍSICA / REGISTROS", 12, AQUA, true))
         val physicalPoints = mutableListOf<Triple<String, Int, Int>>()
         for (i in max(0, workouts.length() - 7) until workouts.length()) {
@@ -1742,6 +1744,7 @@ class MainActivity : Activity() {
     private fun readArray(key: String) = try { JSONArray(prefs.getString(key, "[]")) } catch (_: Exception) { JSONArray() }
     private fun saveArray(key: String, a: JSONArray) {
         prefs.edit().putString(key, a.toString()).apply()
+        if (key == "income" || key == "expenses") IncomeWidgetProvider.refreshAll(this)
         if (key == "missions") {
             TodoWidgetProvider.refreshAll(this)
             if (prefs.getBoolean("notifications_enabled", true)) {
@@ -1883,52 +1886,128 @@ private class ProgressChart(context: Context, private val points: List<Triple<St
 
 private class IncomeChart(context: Context, private val points: List<Pair<String, Double>>) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (points.isEmpty()) return
-        val w = width.toFloat(); val h = height.toFloat()
-        val left = 42f; val right = w - 12f; val top = 20f; val bottom = h - 24f
+
+        val density = resources.displayMetrics.density
+        fun dp(value: Float) = value * density
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val left = dp(54f)
+        val right = w - dp(12f)
+        val top = dp(20f)
+        val bottom = h - dp(25f)
+        if (right <= left || bottom <= top) return
+
         val values = points.map { it.second }
         val minValue = values.minOrNull() ?: 0.0
-        val maxValue = values.maxOrNull() ?: 1.0
-        val range = (maxValue - minValue).coerceAtLeast(1.0)
-        val up = (values.lastOrNull() ?: 0.0) >= (values.firstOrNull() ?: 0.0)
-        val lineColor = if (up) AQUA else DANGER
-        fun y(value: Double) = bottom - (((value - minValue) / range).toFloat() * (bottom - top))
-        paint.color = GRID; paint.strokeWidth = 1f
+        val maxValue = values.maxOrNull() ?: 0.0
+        val rawRange = maxValue - minValue
+        val padding = if (rawRange < 0.01) max(1.0, abs(maxValue) * 0.015) else rawRange * 0.12
+        val low = minValue - padding
+        val high = maxValue + padding
+        val range = (high - low).coerceAtLeast(1.0)
+        fun y(value: Double): Float = bottom - (((value - low) / range).toFloat() * (bottom - top))
+
+        val first = values.first()
+        val last = values.last()
+        val up = last >= first
+        val accent = if (up) AQUA else DANGER
+
+        // Horizontal price levels and quiet vertical time guides, as in a trading chart.
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = dp(1f)
+        paint.color = GRID
         for (i in 0..3) {
-            val yy = top + i * (bottom - top) / 3f
+            val yy = top + (bottom - top) * i / 3f
             canvas.drawLine(left, yy, right, yy, paint)
+            val axisValue = high - (high - low) * i / 3.0
+            paint.style = Paint.Style.FILL
+            paint.textSize = dp(9f)
+            paint.color = MUTED
+            canvas.drawText(axisMoney(axisValue), dp(1f), yy + dp(3.5f), paint)
+            paint.style = Paint.Style.STROKE
+            paint.color = GRID
         }
+        for (i in 1..3) {
+            val xx = left + (right - left) * i / 4f
+            paint.color = 0x6630543F
+            paint.strokeWidth = dp(0.8f)
+            canvas.drawLine(xx, top, xx, bottom, paint)
+        }
+
         val slot = if (points.size <= 1) 0f else (right - left) / (points.size - 1).toFloat()
         val line = Path()
-        points.forEachIndexed { index, point ->
+        val coords = points.mapIndexed { index, point ->
             val x = if (points.size == 1) (left + right) / 2f else left + slot * index
-            val yy = y(point.second)
-            if (index == 0) line.moveTo(x, yy) else line.lineTo(x, yy)
+            x to y(point.second)
         }
-        val firstX = if (points.size == 1) (left + right) / 2f else left
-        val lastX = if (points.size == 1) (left + right) / 2f else right
-        val fill = Path().apply { addPath(line); lineTo(lastX, bottom); lineTo(firstX, bottom); close() }
-        paint.color = (lineColor and 0x00FFFFFF) or (0x30 shl 24); paint.style = Paint.Style.FILL
-        canvas.drawPath(fill, paint)
-        paint.color = lineColor; paint.strokeWidth = 3.5f; paint.style = Paint.Style.STROKE; paint.strokeCap = Paint.Cap.ROUND; paint.strokeJoin = Paint.Join.ROUND
-        canvas.drawPath(line, paint); paint.style = Paint.Style.FILL
-        points.forEachIndexed { index, point ->
-            if (index == points.lastIndex || index == 0) {
-                val x = if (points.size == 1) (left + right) / 2f else left + slot * index
-                paint.color = lineColor; canvas.drawCircle(x, y(point.second), if (index == points.lastIndex) 5f else 3f, paint)
-            }
+        coords.forEachIndexed { index, point ->
+            if (index == 0) line.moveTo(point.first, point.second) else line.lineTo(point.first, point.second)
         }
-        paint.color = MUTED; paint.textSize = 10f
-        val firstLabel = points.first().first
-        val lastLabel = points.last().first
-        canvas.drawText(firstLabel, left, h - 5f, paint)
-        val labelWidth = paint.measureText(lastLabel)
-        canvas.drawText(lastLabel, right - labelWidth, h - 5f, paint)
-        paint.color = lineColor; paint.textSize = 11f
-        val finalValue = values.last()
-        val formatted = "R$ " + String.format(Locale("pt", "BR"), "%,.0f", finalValue)
-        canvas.drawText(formatted, left, 13f, paint)
+        val firstX = coords.first().first
+        val lastX = coords.last().first
+        val area = Path().apply { addPath(line); lineTo(lastX, bottom); lineTo(firstX, bottom); close() }
+        paint.style = Paint.Style.FILL
+        paint.shader = android.graphics.LinearGradient(
+            0f, top, 0f, bottom,
+            intArrayOf((accent and 0x00FFFFFF) or 0x55222222, (accent and 0x00FFFFFF) or 0x05222222),
+            null, android.graphics.Shader.TileMode.CLAMP
+        )
+        canvas.drawPath(area, paint)
+        paint.shader = null
+
+        // Wide translucent stroke creates a soft glow, then a crisp market-price line.
+        paint.color = (accent and 0x00FFFFFF) or 0x55333333
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = dp(7f)
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeJoin = Paint.Join.ROUND
+        canvas.drawPath(line, paint)
+        paint.color = accent
+        paint.strokeWidth = dp(2.6f)
+        canvas.drawPath(line, paint)
+        paint.style = Paint.Style.FILL
+
+        // Current price guide and emphasized last quote.
+        val end = coords.last()
+        paint.color = (accent and 0x00FFFFFF) or 0x88999999
+        paint.strokeWidth = dp(1f)
+        paint.style = Paint.Style.STROKE
+        canvas.drawLine(end.first, top, end.first, bottom, paint)
+        paint.style = Paint.Style.FILL
+        paint.color = accent
+        canvas.drawCircle(end.first, end.second, dp(5f), paint)
+        paint.color = BG
+        canvas.drawCircle(end.first, end.second, dp(2.2f), paint)
+
+        // Time axis labels and latest balance.
+        paint.color = MUTED
+        paint.textSize = dp(9f)
+        canvas.drawText(points.first().first, left, h - dp(5f), paint)
+        val middle = points[points.size / 2].first
+        val middleWidth = paint.measureText(middle)
+        canvas.drawText(middle, (left + right - middleWidth) / 2f, h - dp(5f), paint)
+        val endLabel = points.last().first
+        canvas.drawText(endLabel, right - paint.measureText(endLabel), h - dp(5f), paint)
+        paint.color = accent
+        paint.textSize = dp(10f)
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        val quote = "R$ " + String.format(Locale("pt", "BR"), "%,.2f", last)
+        canvas.drawText(quote, left, dp(12f), paint)
+        paint.typeface = android.graphics.Typeface.DEFAULT
+    }
+
+    private fun axisMoney(value: Double): String {
+        val absolute = abs(value)
+        val sign = if (value < 0) "−" else ""
+        return when {
+            absolute >= 1_000_000 -> sign + "${String.format(Locale.US, "%.1f", absolute / 1_000_000)}M"
+            absolute >= 10_000 -> sign + "${(absolute / 1_000).toInt()}k"
+            absolute >= 1_000 -> sign + "${String.format(Locale.US, "%.1f", absolute / 1_000)}k"
+            else -> sign + String.format(Locale("pt", "BR"), "%.0f", absolute)
+        }
     }
 }

@@ -52,12 +52,13 @@ class TodoWidgetProvider : AppWidgetProvider() {
             val pending = mutableListOf<JSONObject>()
             for (index in 0 until all.length()) {
                 val item = all.optJSONObject(index) ?: continue
-                if (item.optString("status", "pendente") !in listOf("concluída", "cancelada")) pending.add(item)
+                val status = normalizeStatus(item.optString("status", "pendente"))
+                if (status !in setOf("concluida", "cancelada", "completed", "cancelled", "canceled", "done")) pending.add(item)
             }
-            val priorityRank = mapOf("CRÍTICA" to 0, "ALTA" to 1, "NORMAL" to 2, "BAIXA" to 3)
-            pending.sortWith(compareBy<JSONObject> { it.optString("due", "9999-12-31").ifBlank { "9999-12-31" } }
-                .thenBy { priorityRank[it.optString("priority").uppercase()] ?: 4 }
-                .thenBy { it.optString("title").lowercase() })
+            val priorityRank = mapOf("CRITICA" to 0, "ALTA" to 1, "NORMAL" to 2, "BAIXA" to 3)
+            pending.sortWith(compareBy<JSONObject> { missionDue(it).ifBlank { "9999-12-31" } }
+                .thenBy { priorityRank[normalizeStatus(it.optString("priority")).uppercase()] ?: 4 }
+                .thenBy { missionTitle(it).lowercase() })
 
             val options = manager.getAppWidgetOptions(widgetId)
             val allocatedHeight = options.getInt(
@@ -67,7 +68,8 @@ class TodoWidgetProvider : AppWidgetProvider() {
             // MAX_HEIGHT tracks user resizing. Reserve 36dp for header and outer padding,
             // then allocate one compact row for each ~34dp of remaining space.
             val maxRows = if (allocatedHeight > 0) {
-                ((allocatedHeight - 36) / 34).coerceIn(1, 6)
+                // Account for vertical padding, the fixed header, row gaps and overflow label.
+                ((allocatedHeight - 32) / 33).coerceIn(1, 6)
             } else 2
             val visibleCount = minOf(pending.size, maxRows)
 
@@ -95,12 +97,16 @@ class TodoWidgetProvider : AppWidgetProvider() {
                 if (index < visibleCount) {
                     val item = pending[index]
                     views.setViewVisibility(rowIds[index], View.VISIBLE)
-                    views.setTextViewText(textIds[index], item.optString("title", "Missão sem título"))
-                    val due = item.optString("due").takeIf { it.isNotBlank() }
+                    views.setTextViewText(textIds[index], missionTitle(item))
+                    val due = missionDue(item).takeIf { it.isNotBlank() }
                     val category = item.optString("category").takeIf { it.isNotBlank() }
                     val priority = item.optString("priority").takeIf { it.isNotBlank() }
                     val dueLabel = due?.let {
-                        val shortDate = if (it.length >= 10) "${it.substring(8, 10)}/${it.substring(5, 7)}" else it
+                        val shortDate = when {
+                            it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> "${it.substring(8, 10)}/${it.substring(5, 7)}"
+                            it.matches(Regex("\\d{2}/\\d{2}/\\d{4}")) -> it.substring(0, 5)
+                            else -> it
+                        }
                         "PRAZO $shortDate${item.optString("dueTime").takeIf { t -> t.isNotBlank() }?.let { t -> " $t" } ?: ""}"
                     }
                     val details = listOfNotNull(dueLabel, category, priority).joinToString("  ·  ").ifBlank { "SEM PRAZO DEFINIDO" }
@@ -136,6 +142,17 @@ class TodoWidgetProvider : AppWidgetProvider() {
             checkIds.forEach { views.setOnClickPendingIntent(it, openPendingIntent) }
             manager.updateAppWidget(widgetId, views)
         }
+
+        private fun normalizeStatus(value: String): String {
+            val normalized = java.text.Normalizer.normalize(value.trim().lowercase(), java.text.Normalizer.Form.NFD)
+            return normalized.replace(Regex("\\p{Mn}+"), "")
+        }
+
+        private fun missionTitle(item: JSONObject): String =
+            item.optString("title").ifBlank { item.optString("name").ifBlank { "Missão sem título" } }
+
+        private fun missionDue(item: JSONObject): String =
+            item.optString("due").ifBlank { item.optString("dueDate").ifBlank { item.optString("deadline") } }
     }
 }
 

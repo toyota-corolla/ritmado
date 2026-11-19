@@ -3,78 +3,74 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:gravity="center_vertical"
-    android:paddingStart="10dp"
-    android:paddingEnd="9dp"
-    android:paddingTop="5dp"
-    android:paddingBottom="5dp"
+    android:paddingStart="11dp"
+    android:paddingEnd="11dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp"
     android:background="@drawable/widget_income_bg">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center_vertical">
-
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="SALDO ACUMULADO"
             android:textColor="#A7D8BC"
             android:textSize="9sp"
             android:textStyle="bold"
             android:letterSpacing="0.07"
             android:includeFontPadding="false" />
-
         <TextView
-            android:id="@+id/widget_income_total"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:text="R$ 0,00"
-            android:textColor="#E7FFF0"
-            android:textSize="18sp"
+            android:text="7D"
+            android:textColor="#8BF4B8"
+            android:textSize="8sp"
             android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:includeFontPadding="false" />
-
-        <TextView
-            android:id="@+id/widget_income_today"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:text="Hoje: R$ 0,00"
-            android:textColor="#B5DCC4"
-            android:textSize="9sp"
-            android:maxLines="1"
             android:includeFontPadding="false" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/widget_income_total"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:text="R$ 0,00"
+        android:textColor="#E7FFF0"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false" />
+
     <LinearLayout
-        android:layout_width="72dp"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center">
-
+        android:layout_width="match_parent"
+        android:layout_height="15dp"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/widget_income_today"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="ÚLTIMOS 7 DIAS"
-            android:textColor="#8BB49B"
-            android:textSize="7sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.04"
+            android:layout_weight="1"
+            android:text="HOJE  R$ 0,00"
+            android:textColor="#B5DCC4"
+            android:textSize="9sp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:includeFontPadding="false" />
-
         <ImageView
             android:id="@+id/widget_income_chart"
-            android:layout_width="68dp"
-            android:layout_height="28dp"
-            android:layout_marginTop="2dp"
-            android:contentDescription="Mini gráfico do saldo líquido dos últimos sete dias"
+            android:layout_width="54dp"
+            android:layout_height="14dp"
+            android:contentDescription="Tendência do saldo nos últimos sete dias"
             android:scaleType="fitCenter" />
     </LinearLayout>
 </LinearLayout>
