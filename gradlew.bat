@@ -1,4 +1,5 @@
 @echo off
-set DIR=%~dp0
-if defined JAVA_HOME (set JAVA=%JAVA_HOME%\bin\java.exe) else (set JAVA=java.exe)
-"%JAVA%" -classpath "%DIR%gradle\wrapper\gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain %*
+where gradle >nul 2>nul
+if %errorlevel%==0 (gradle %*) & exit /b %errorlevel%
+echo Gradle 8.9 nao esta instalado. Use o GitHub Actions ou instale Gradle 8.9 para compilar localmente.
+exit /b 1

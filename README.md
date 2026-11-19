@@ -1,87 +1,43 @@
-# LIFE.EXE — Discipline Protocol
+# Projeto Android — Painel pessoal
 
-Aplicativo Android nativo em Kotlin, atualizado sobre o projeto-base RITMO. A estrutura original, o `applicationId` (`com.ritmo.planner`), as preferências locais existentes e os providers dos widgets foram preservados. A interface foi convertida para o visual **Cyber Core / Matrix**: preto profundo, verde neon, painéis HUD, tipografia monoespaçada e navegação inferior.
+Aplicativo Android nativo em Java, com armazenamento local SQLite e interface escura em verde neon.
 
-## Módulos
+## Recursos
 
-- **Dashboard:** resumo financeiro com gráfico de patrimônio no mês, recordes físicos, missões do dia, hábitos, foco e objetivos.
-- **Financeiro:** cadastro, edição e exclusão de receitas e despesas; seleção de data para lançar histórico anterior; saldo total, saldo do dia, evolução financeira e meta mensal configurável.
-- **Físico:** registro, edição e exclusão de flexões e barras; recordes pessoais por exercício com a data do recorde; comparação visual do último treino com o anterior e gráfico de evolução.
-- **Mission Control:** missões por categoria, prioridade, dificuldade e prazo selecionado pelo calendário; conclusão, início, adiamento com motivo e registro de abandono. Limite de três missões prioritárias ativas por dia.
-- **Habit System:** frequência diária, dias úteis ou semanal; meta normal e mínima; lembretes locais; registro retroativo com calendário; calendário de 28 dias; sequência atual, melhor sequência e consistência.
-- **Calendário de registros:** seletor de calendário em receitas, despesas, prazos de missões, treinos, diário de evolução e registros retroativos de hábitos.
-- **Focus Mode:** sessões de 5, 25, 45 ou 60 minutos, com pausar, retomar, concluir e cancelar. O tempo é baseado em timestamps persistidos e é recuperado ao abrir o app novamente.
-- **Anti-Procrastination Protocol:** motivos de evitação, resistência de 1 a 10, primeira ação recomendada e histórico de enfrentamento.
-- **Projeto Liberdade:** objetivos, descrição, edição, etapas, conclusão e progresso percentual; diário de avanços mantido.
-- **XP e conquistas:** pontuação por ações, histórico, níveis e conquistas por metas reais registradas.
-- **Analytics:** produtividade, hábitos, foco, finanças, físico, procrastinação, taxa de enfrentamento, recomendações e snapshots de relatórios semanais.
-- **Notificações:** lembretes locais para hábitos e avisos automáticos quando vencem prazos de missões, com a mensagem “Você esqueceu de fazer a …”. Um aviso por item/prazo; alarmes restaurados após reiniciar o celular.
-- **Configurações:** metas pessoais, ativação/desativação de notificações locais, exportação e restauração de backup JSON.
-- **Widgets:** saldo acumulado em largura total, com resultado do dia e mini tendência de sete dias; widget Mission Control ligado às missões reais, com linhas que se expandem conforme a altura disponível e até seis missões. Ambos usam fundo escuro translúcido. Saldo e missões atualizam ao salvar seus respectivos dados e ao abrir o app.
+- Finanças: entradas, saídas, descrição, data, saldo total, saldo do dia e gráfico dos últimos sete dias.
+- Treinos: registros de flexões e barras; último resultado, recorde e comparação com o treino anterior.
+- Missões: criação de missões, subquests, marcação de etapas concluídas e barra de progresso.
+- Estatísticas e configurações para consultar os dados e apagá-los.
 
-## Compatibilidade e persistência
-
-- Android Gradle Plugin 8.7.3
-- Gradle 8.9
-- Kotlin 2.0.21
-- JDK 17
-- compileSdk / targetSdk 35
-- minSdk 26 (Android 8.0)
-- `applicationId`: `com.ritmo.planner` (preservado para manter a identidade do app-base)
-- `versionCode`: 13 / `versionName`: 7.6
-- Sem conta, servidor ou dependência de conexão para usar as funções locais.
-
-
-**Atualização da instalação existente:** o package ID foi mantido. Para instalar por cima da versão atual sem desinstalar, o APK novo também precisa estar assinado com a mesma chave do APK instalado. APKs debug assinados por máquinas/ambientes diferentes podem usar chaves diferentes; nesse caso, o Android pode recusar a atualização. Antes de reinstalar ou trocar de aparelho, exporte um backup em Configurações.
+Os dados ficam no aparelho. O projeto não exige login, servidor ou permissões especiais.
 
 ## Compilar pelo GitHub Actions
 
-1. Crie um repositório GitHub vazio.
-3. Faça commit na branch `main`.
-4. Abra a aba **Actions** e selecione **LIFE.EXE Android CI**.
-5. A execução também começa automaticamente a cada push na branch `main`; para iniciar manualmente, use **Run workflow**.
-6. Quando terminar, abra a execução e baixe o artefato **`life-exe-debug-apk`**.
-7. Extraia o artefato e instale `app-debug.apk` no Android.
+1. Crie um repositório novo no GitHub.
+2. Extraia este ZIP no computador/celular.
+3. Envie todos os arquivos e pastas para a raiz do repositório. A pasta `.github/workflows` precisa ser enviada também.
+4. Abra a aba **Actions** no GitHub.
+5. Se aparecer, clique em **I understand my workflows, go ahead and enable them**.
+6. Faça um commit na branch `main` ou `master`, ou abra o workflow **Build APK** e clique em **Run workflow**.
+7. Aguarde o job ficar verde.
+8. Abra a execução concluída, desça até **Artifacts** e baixe `aplicativo-debug`.
+9. Extraia o ZIP baixado. O arquivo `app-debug.apk` é o instalador.
 
-O workflow instala Java 17 e Android SDK 35, prepara o Gradle Wrapper e executa. A versão do app foi incrementada para 7.6, mantendo o mesmo `applicationId`:
+O workflow configura Java 17, instala Android API 35 e Gradle 8.9 automaticamente. Em seguida, gera o Gradle Wrapper oficial dentro do próprio runner e compila usando `./gradlew`. A combinação AGP 8.7.3 + Gradle 8.9 + JDK 17 segue a matriz oficial de compatibilidade do Android Gradle Plugin.
 
-```bash
-./gradlew --no-daemon assembleDebug
+## Compilar localmente
+
+É necessário ter JDK 17, Android SDK (API 35) e acesso à internet na primeira execução. Na raiz do projeto, execute `./gradlew assembleDebug` (Linux/macOS) ou `gradlew.bat assembleDebug` (Windows). O lançador local baixa Gradle 8.9 se ele ainda não estiver instalado.
+
+O APK será gerado em:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Compilar localmente (opcional)
+## Observações
 
-Com JDK 17 e Android SDK 35 instalados, na raiz do projeto execute:
-
-```bash
-./gradlew --no-daemon assembleDebug
-```
-
-O APK será gerado em `app/build/outputs/apk/debug/app-debug.apk`.
-
-## Widgets
-
-1. Instale o APK.
-2. Toque e segure uma área vazia da tela inicial do Android.
-3. Abra **Widgets** e procure **LIFE.EXE**.
-4. Adicione **Saldo — LIFE.EXE** (2×1) ou **Missões — LIFE.EXE** (2×2). Se já tinha os widgets antigos, remova-os da tela inicial e adicione-os novamente para aplicar as novas dimensões mínimas.
-
-## Observações de validação
-
-O projeto mantém o Gradle Wrapper e o workflow configurados. Neste ambiente de edição não há Android SDK instalado e a conexão a `services.gradle.org` está indisponível; por isso, a compilação real do APK deve ser confirmada no runner do GitHub Actions. XMLs, arquivos de configuração e estrutura do workflow podem ser verificados localmente antes do push, mas isso não substitui a compilação Android no CI.
-
-
-## Atualização sem conflito de assinatura
-
-O workflow aceita uma chave persistente por meio dos GitHub Actions Secrets:
-`LIFE_EXE_KEYSTORE_BASE64`, `LIFE_EXE_KEYSTORE_PASSWORD`, `LIFE_EXE_KEY_ALIAS` e `LIFE_EXE_KEY_PASSWORD`.
-A chave configurada precisa ser exatamente a mesma usada para assinar o APK atualmente instalado.
-Sem esses secrets, o workflow usa a chave debug efêmera do runner e o Android pode recusar a atualização.
-Não desinstale o aplicativo para contornar o erro antes de exportar e guardar um backup.
-
-## LIFE.EXE 7.6
-
-- A lista independente To-do foi removida da interface. O conteúdo antigo da chave `todos` permanece guardado nas preferências para não apagar dados históricos.
-- O widget de saldo agora usa toda a largura para exibir o valor acumulado, sinaliza resultados negativos/positivos, mostra o líquido de hoje e mantém um mini gráfico de saldo acumulado dos últimos sete dias. Atualiza em toda gravação de receita ou gasto.
-- O widget Mission Control lê as missões salvas, reconhece status com e sem acentos, aceita campos de título/prazo legados e calcula quantas linhas exibir a partir da altura máxima redimensionada. As linhas ocupam o espaço vertical disponível.
-- O gráfico financeiro da tela inicial ganhou eixo de valores, grade temporal, área sombreada, linha de destaque e marcação da cotação final, em verde quando sobe e vermelho quando cai. A série é o saldo acumulado dia a dia do mês atual, calculado com as receitas e despesas registradas.
+- O aplicativo ainda não tem nome comercial; o rótulo do launcher foi deixado vazio.
+- O gráfico financeiro usa os valores registrados nos últimos sete dias, não cotações reais de bolsa.
+- O ZIP não carrega o JAR binário oficial do Gradle Wrapper. Para não deixar a compilação do GitHub dependente desse arquivo ausente, o workflow gera o Wrapper oficial durante a execução e usa esse Wrapper para compilar. O `gradlew` incluído é apenas um bootstrap local.
+- O APK gerado pelo workflow é de depuração (`debug`), adequado para instalar e testar. Para publicar na Play Store, será necessário configurar assinatura de versão (`release`).
