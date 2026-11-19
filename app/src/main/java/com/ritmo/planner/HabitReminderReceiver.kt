@@ -127,6 +127,7 @@ class HabitReminderBootReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val prefs = context.getSharedPreferences("ritmo_data", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("notifications_enabled", true)) return
+        DeadlineReminderScheduler.syncAll(context)
         val habits = try { org.json.JSONArray(prefs.getString("habits", "[]")) } catch (_: Exception) { org.json.JSONArray() }
         for (i in 0 until habits.length()) {
             val habit = habits.optJSONObject(i) ?: continue

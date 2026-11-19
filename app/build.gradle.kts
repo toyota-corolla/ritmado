@@ -11,8 +11,8 @@ android {
         applicationId = "com.ritmo.planner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "7.1"
+        versionCode = 11
+        versionName = "7.4"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

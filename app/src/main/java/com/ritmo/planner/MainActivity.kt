@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -72,12 +73,19 @@ class MainActivity : Activity() {
         checkFocusCompletion()
         syncAchievements()
         generateWeeklyReportIfNeeded()
-        if (prefs.getBoolean("notifications_enabled", true)) scheduleAllHabitReminders()
+        if (prefs.getBoolean("notifications_enabled", true)) {
+            scheduleAllHabitReminders()
+            DeadlineReminderScheduler.syncAll(this)
+            if (hasActiveDeadlines()) requestNotificationPermissionIfNeeded()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         checkFocusCompletion()
+        // Recalcula e publica os dados atuais; evita o widget ficar preso em R$ 0,00 após atualizar o app.
+        refreshWidgets()
+        DeadlineReminderScheduler.syncAll(this)
         if (page == "focus") startFocusTicker()
     }
 
@@ -131,7 +139,6 @@ class MainActivity : Activity() {
             "money" -> moneyPage(body)
             "body" -> bodyPage(body)
             "social" -> socialPage(body)
-            "todo" -> todoPage(body)
             "missions" -> missionPage(body)
             "habits" -> habitsPage(body)
             "focus" -> focusPage(body)
@@ -161,8 +168,8 @@ class MainActivity : Activity() {
     }
 
     private fun quickActions() {
-        val labels = arrayOf("Registrar receita ou gasto", "Registrar treino", "Adicionar tarefa", "Criar missão", "Registrar hábito", "Registrar avanço", "Criar objetivo", "Iniciar sessão de foco", "Protocolo anti-procrastinação")
-        val pages = arrayOf("money", "body", "todo", "missions", "habits", "social", "goals", "focus", "avoidance")
+        val labels = arrayOf("Registrar receita ou gasto", "Registrar treino", "Criar missão", "Registrar hábito", "Registrar avanço", "Criar objetivo", "Iniciar sessão de foco", "Protocolo anti-procrastinação")
+        val pages = arrayOf("money", "body", "missions", "habits", "social", "goals", "focus", "avoidance")
         AlertDialog.Builder(this).setTitle("＋  AÇÃO RÁPIDA").setItems(labels) { _, which -> showPage(pages[which]) }.setNegativeButton("Fechar", null).show()
     }
 
@@ -184,32 +191,41 @@ class MainActivity : Activity() {
 
         val balance = totalIncome() - totalExpenses()
         val today = todayNet()
-        val finance = lastSevenDaysNet()
+        val finance = monthlyPatrimonySeries()
         val financeTrend = if (finance.size >= 2) finance.last().second - finance.first().second else 0.0
         val financeRow = horizontal()
         smallStat(financeRow, "SALDO TOTAL", "R$ ${money(balance)}", if (balance >= 0) AQUA else DANGER, 1f) { showPage("money") }
         smallStat(financeRow, "SALDO DE HOJE", "R$ ${money(today)}", if (today >= 0) AQUA else DANGER, 1f) { showPage("money") }
         b.addView(financeRow)
         card(b) {
-            addView(label("⌁  FINANCEIRO  /  7 DIAS", 11, AQUA, true))
-            addView(label("${if (financeTrend >= 0) "▲" else "▼"} Variação: R$ ${money(kotlin.math.abs(financeTrend))}", 11, MUTED, true))
+            addView(label("⌁  PATRIMÔNIO  /  MÊS ATUAL", 11, AQUA, true))
+            addView(label("${if (financeTrend >= 0) "▲" else "▼"} ${if (financeTrend >= 0) "EM ALTA" else "EM QUEDA"}  •  R$ ${money(kotlin.math.abs(financeTrend))} no período", 11, if (financeTrend >= 0) AQUA else DANGER, true))
             addView(IncomeChart(this@MainActivity, finance).apply { layoutParams = LinearLayout.LayoutParams(-1, 125) })
             action(this, "ABRIR FINANCEIRO  ↗", AQUA) { showPage("money") }
         }
 
         val exercises = todayExercise()
-        val totals = allExerciseTotals()
-        val trend = workoutDirection()
+        val pushRecord = personalExerciseRecord("push")
+        val pullRecord = personalExerciseRecord("pull")
+        val pushTrend = exerciseDayTrend("push")
+        val pullTrend = exerciseDayTrend("pull")
         card(b) {
-            addView(label("▥  PERFORMANCE FÍSICA", 12, AQUA, true))
+            addView(label("▥  PERFORMANCE FÍSICA  /  RECORDES PESSOAIS", 12, AQUA, true))
             val row = horizontal()
             val left = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
-            left.addView(label("FLEXÕES", 10, MUTED, true)); left.addView(label("${totals.first}", 27, INK, true)); left.addView(label("Hoje: ${exercises.first}", 10, MUTED))
+            left.addView(label("FLEXÕES", 10, MUTED, true))
+            left.addView(label("${pushRecord.first}", 29, INK, true))
+            left.addView(label("RECORDE  •  ${pushRecord.second.ifBlank { "—" }}", 9, MUTED))
+            left.addView(label("${pushTrend.first} ${pushTrend.second}", 11, pushTrend.third, true))
+            left.addView(label("Hoje: ${exercises.first}", 10, MUTED))
             val right = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
-            right.addView(label("BARRAS", 10, MUTED, true)); right.addView(label("${totals.second}", 27, INK, true)); right.addView(label("Hoje: ${exercises.second}", 10, MUTED))
+            right.addView(label("BARRAS", 10, MUTED, true))
+            right.addView(label("${pullRecord.first}", 29, INK, true))
+            right.addView(label("RECORDE  •  ${pullRecord.second.ifBlank { "—" }}", 9, MUTED))
+            right.addView(label("${pullTrend.first} ${pullTrend.second}", 11, pullTrend.third, true))
+            right.addView(label("Hoje: ${exercises.second}", 10, MUTED))
             row.addView(left, LinearLayout.LayoutParams(0, -2, 1f)); row.addView(right, LinearLayout.LayoutParams(0, -2, 1f)); addView(row)
-            addView(label("${trend.first}  ${trend.second}", 11, if (trend.first.contains("MELHORANDO")) AQUA else if (trend.first.contains("PIORANDO")) DANGER else MUTED, true))
-            action(this, "REGISTRAR TREINO  ↗", AQUA) { showPage("body") }
+            action(this, "SUPERAR MEU RECORDE  ↗", AQUA) { showPage("body") }
         }
 
         val todayMissions = activeMissionsForToday()
@@ -257,17 +273,6 @@ class MainActivity : Activity() {
             action(this, "GERENCIAR OBJETIVOS  ↗", AQUA) { showPage("goals") }
         }
 
-        val pending = pendingTodos()
-        card(b) {
-            addView(label("☑  TO-DO / ${pending.length()} PENDENTE(S)", 12, AQUA, true))
-            for (i in 0 until min(3, pending.length())) {
-                val item = pending.optJSONObject(i) ?: continue
-                val due = item.optString("due")
-                addView(label("□ ${item.optString("title")}${if (due.isNotBlank()) "  •  $due" else ""}", 12, INK))
-            }
-            if (pending.length() == 0) addView(label("Nenhuma tarefa pendente.", 11, MUTED))
-            action(this, "GERENCIAR TAREFAS  ↗", AQUA) { showPage("todo") }
-        }
         card(b) {
             addView(label("ANTI-PROCRASTINATION PROTOCOL", 11, WARNING, true))
             addView(label("Identifique a resistência. Defina a primeira ação. Comece por cinco minutos.", 12, INK))
@@ -292,39 +297,45 @@ class MainActivity : Activity() {
         b.addView(label("NOVA RECEITA", 12, AQUA, true))
         val incomeValue = field("Valor recebido (ex.: 150,00)", true)
         val incomeDesc = field("Origem / descrição", false)
-        b.addView(incomeValue); b.addView(incomeDesc)
+        val incomeDate = datePickerControl("DATA DA ENTRADA", date)
+        b.addView(incomeValue); b.addView(incomeDesc); b.addView(incomeDate)
         action(b, "＋  SALVAR RECEITA") {
             val amount = parseAmount(incomeValue.text.toString())
             if (amount == null || amount <= 0) toast("Digite um valor válido") else {
+                val selectedDate = incomeDate.tag as? String ?: date
                 val a = readArray("income")
-                a.put(JSONObject().put("id", newId()).put("date", date).put("amount", amount).put("desc", incomeDesc.text.toString().ifBlank { "Receita" }))
-                saveArray("income", a); refreshWidgets(); showPage("money"); toast("Receita salva")
+                a.put(JSONObject().put("id", newId()).put("date", selectedDate).put("amount", amount).put("desc", incomeDesc.text.toString().ifBlank { "Receita" }))
+                saveArray("income", a); refreshWidgets(); showPage("money")
+                toast(if (selectedDate == date) "Receita salva" else "Receita histórica salva em $selectedDate")
             }
         }
         b.addView(label("NOVO GASTO", 12, AQUA, true))
         val expenseValue = field("Valor gasto (ex.: 35,90)", true)
         val expenseDesc = field("Com o que você gastou?", false)
-        b.addView(expenseValue); b.addView(expenseDesc)
+        val expenseDate = datePickerControl("DATA DO GASTO", date)
+        b.addView(expenseValue); b.addView(expenseDesc); b.addView(expenseDate)
         action(b, "−  REGISTRAR GASTO", WARNING) {
             val amount = parseAmount(expenseValue.text.toString())
             if (amount == null || amount <= 0) toast("Digite um valor válido") else {
+                val selectedDate = expenseDate.tag as? String ?: date
                 val a = readArray("expenses")
-                a.put(JSONObject().put("id", newId()).put("date", date).put("amount", amount).put("desc", expenseDesc.text.toString().ifBlank { "Gasto" }))
-                saveArray("expenses", a); refreshWidgets(); showPage("money"); toast("Gasto registrado e descontado do saldo")
+                a.put(JSONObject().put("id", newId()).put("date", selectedDate).put("amount", amount).put("desc", expenseDesc.text.toString().ifBlank { "Gasto" }))
+                saveArray("expenses", a); refreshWidgets(); showPage("money")
+                toast(if (selectedDate == date) "Gasto registrado e descontado do saldo" else "Gasto histórico salvo em $selectedDate")
             }
         }
         b.addView(label("HISTÓRICO DE RECEITAS", 12, AQUA, true))
         val incomes = readArray("income")
         for (i in incomes.length() - 1 downTo 0) {
             val o = incomes.optJSONObject(i) ?: continue
-            editableRecord(b, "＋ ${o.optString("desc")}  •  ${o.optString("date")}", "R$ ${money(o.optDouble("amount"))}", "Editar receita", { editMoneyRecord("income", i) }, { deleteMoneyRecord("income", i) })
+            editableRecord(b, "＋ ${o.optString("desc")}  •  ${o.optString("date")}", "R$ ${money(transactionAmount(o))}", "Editar receita", { editMoneyRecord("income", i) }, { deleteMoneyRecord("income", i) })
         }
         if (incomes.length() == 0) b.addView(label("Nenhuma receita registrada.", 12, MUTED))
         b.addView(label("HISTÓRICO DE GASTOS", 12, AQUA, true))
         val expenses = readArray("expenses")
         for (i in expenses.length() - 1 downTo 0) {
             val o = expenses.optJSONObject(i) ?: continue
-            editableRecord(b, "− ${o.optString("desc")}  •  ${o.optString("date")}", "R$ ${money(o.optDouble("amount"))}", "Editar gasto", { editMoneyRecord("expenses", i) }, { deleteMoneyRecord("expenses", i) })
+            editableRecord(b, "− ${o.optString("desc")}  •  ${o.optString("date")}", "R$ ${money(transactionAmount(o))}", "Editar gasto", { editMoneyRecord("expenses", i) }, { deleteMoneyRecord("expenses", i) })
         }
         if (expenses.length() == 0) b.addView(label("Nenhum gasto registrado.", 12, MUTED))
     }
@@ -340,8 +351,9 @@ class MainActivity : Activity() {
 
     private fun todoPage(b: LinearLayout) {
         header(b, "02 / ORGANIZAÇÃO", "Lista de tarefas")
+        val tasks = readArray("todos")
         val title = field("O que precisa ser feito?", false)
-        val due = field("Prazo (AAAA-MM-DD) — opcional", false)
+        val due = datePickerControl("PRAZO (OPCIONAL)", "", optional = true)
         val dueTime = field("Horário (HH:mm) — opcional", false)
         val priority = spinner(arrayOf("Normal", "Alta", "Crítica"))
         val category = spinner(arrayOf("Pessoal", "Negócio", "Corpo", "Conhecimento", "Finanças"))
@@ -349,13 +361,12 @@ class MainActivity : Activity() {
         b.addView(label("CATEGORIA", 10, MUTED, true)); b.addView(category)
         action(b, "＋  ADICIONAR TAREFA") {
             val text = title.text.toString().trim()
-            if (text.isBlank()) toast("Digite uma tarefa") else if (due.text.isNotBlank() && !validDate(due.text.toString().trim())) toast("Prazo inválido. Use AAAA-MM-DD") else if (dueTime.text.isNotBlank() && !validTime(dueTime.text.toString().trim())) toast("Horário inválido. Use HH:mm") else {
-                val tasks = readArray("todos")
-                tasks.put(JSONObject().put("id", newId()).put("title", text).put("done", false).put("due", due.text.toString().trim()).put("dueTime", dueTime.text.toString().trim()).put("priority", priority.selectedItem.toString()).put("category", category.selectedItem.toString()).put("createdAt", date))
+            val selectedDue = due.tag as? String ?: ""
+            if (text.isBlank()) toast("Digite uma tarefa") else if (selectedDue.isNotBlank() && !validDate(selectedDue)) toast("Selecione um prazo válido") else if (selectedDue.isBlank() && dueTime.text.isNotBlank()) toast("Selecione uma data para definir o horário do prazo") else if (dueTime.text.isNotBlank() && !validTime(dueTime.text.toString().trim())) toast("Horário inválido. Use HH:mm") else {
+                        tasks.put(JSONObject().put("id", newId()).put("title", text).put("done", false).put("due", selectedDue).put("dueTime", dueTime.text.toString().trim()).put("priority", priority.selectedItem.toString()).put("category", category.selectedItem.toString()).put("createdAt", date).put("overdueNotified", false))
                 saveArray("todos", tasks); TodoWidgetProvider.refreshAll(this@MainActivity); showPage("todo"); toast("Tarefa adicionada")
             }
         }
-        val tasks = readArray("todos")
         val pendingCount = (0 until tasks.length()).count { !(tasks.optJSONObject(it)?.optBoolean("done") ?: true) }
         card(b) { addView(label("$pendingCount PENDENTE(S)  •  ${tasks.length() - pendingCount} CONCLUÍDA(S)", 12, AQUA, true)) }
         for (i in tasks.length() - 1 downTo 0) {
@@ -386,14 +397,13 @@ class MainActivity : Activity() {
             }
         }
         if (tasks.length() == 0) b.addView(label("Sua lista está vazia. Adicione a primeira tarefa.", 12, MUTED))
-        b.addView(label("O widget da tela inicial continua exibindo até três tarefas pendentes.", 10, MUTED))
+        b.addView(label("O widget da tela inicial exibe suas missões ativas.", 10, MUTED))
     }
 
     private fun editTodo(id: String) {
-        val tasks = readArray("todos")
         val item = findById(tasks, id) ?: return
         val title = field("Tarefa", false).apply { setText(item.optString("title")) }
-        val due = field("Prazo (AAAA-MM-DD)", false).apply { setText(item.optString("due")) }
+        val due = datePickerControl("PRAZO (OPCIONAL)", item.optString("due"), optional = true)
         val dueTime = field("Horário (HH:mm)", false).apply { setText(item.optString("dueTime")) }
         val priorityItems = arrayOf("Normal", "Alta", "Crítica")
         val categoryItems = arrayOf("Pessoal", "Negócio", "Corpo", "Conhecimento", "Finanças")
@@ -404,16 +414,21 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Editar tarefa").setView(box).setNegativeButton("Cancelar", null)
             .setPositiveButton("Salvar") { _, _ ->
                 if (title.text.isNullOrBlank()) { toast("Informe o título"); return@setPositiveButton }
-                if (due.text.isNotBlank() && !validDate(due.text.toString().trim())) { toast("Prazo inválido"); return@setPositiveButton }
+                val selectedDue = due.tag as? String ?: ""
+                if (selectedDue.isNotBlank() && !validDate(selectedDue)) { toast("Selecione um prazo válido"); return@setPositiveButton }
+                if (selectedDue.isBlank() && dueTime.text.isNotBlank()) { toast("Selecione uma data para definir o horário do prazo"); return@setPositiveButton }
                 if (dueTime.text.isNotBlank() && !validTime(dueTime.text.toString().trim())) { toast("Horário inválido"); return@setPositiveButton }
-                item.put("title", title.text.toString().trim()).put("due", due.text.toString().trim()).put("dueTime", dueTime.text.toString().trim())
+                val previousDue = item.optString("due")
+                val previousTime = item.optString("dueTime")
+                val selectedTime = dueTime.text.toString().trim()
+                item.put("title", title.text.toString().trim()).put("due", selectedDue).put("dueTime", selectedTime)
                     .put("priority", priority.selectedItem.toString()).put("category", category.selectedItem.toString())
+                if (previousDue != selectedDue || previousTime != selectedTime) item.put("overdueNotified", false)
                 saveArray("todos", tasks); TodoWidgetProvider.refreshAll(this); showPage("todo")
             }.show()
     }
 
     private fun setTodoDone(id: String, done: Boolean) {
-        val tasks = readArray("todos")
         for (i in 0 until tasks.length()) {
             val item = tasks.optJSONObject(i) ?: continue
             if (item.optString("id") == id) {
@@ -436,23 +451,31 @@ class MainActivity : Activity() {
 
     private fun bodyPage(b: LinearLayout) {
         header(b, "03 / PERFORMANCE", "Treino físico")
-        val totals = allExerciseTotals()
         val today = todayExercise()
+        val pushRecord = personalExerciseRecord("push")
+        val pullRecord = personalExerciseRecord("pull")
         card(b) {
-            addView(label("ACUMULADO", 11, MUTED, true))
-            addView(label("${totals.first} flexões  •  ${totals.second} barras", 22, INK, true))
-            addView(label("Hoje: ${today.first} flexões  •  ${today.second} barras", 11, MUTED))
+            addView(label("SEUS RECORDES PESSOAIS  /  SUPERE-SE", 11, AQUA, true))
+            val row = horizontal()
+            val pushBox = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
+            pushBox.addView(label("FLEXÕES", 10, MUTED, true)); pushBox.addView(label("${pushRecord.first}", 32, INK, true)); pushBox.addView(label(if (pushRecord.second.isBlank()) "Ainda sem recorde" else "Desde ${pushRecord.second}", 10, MUTED))
+            val pullBox = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
+            pullBox.addView(label("BARRAS", 10, MUTED, true)); pullBox.addView(label("${pullRecord.first}", 32, INK, true)); pullBox.addView(label(if (pullRecord.second.isBlank()) "Ainda sem recorde" else "Desde ${pullRecord.second}", 10, MUTED))
+            row.addView(pushBox, LinearLayout.LayoutParams(0, -2, 1f)); row.addView(pullBox, LinearLayout.LayoutParams(0, -2, 1f)); addView(row)
+            addView(label("Hoje: ${today.first} flexões  •  ${today.second} barras. Seu próximo treino pode bater esses números.", 11, MUTED))
         }
         val push = field("Quantidade de flexões", true)
         val pull = field("Quantidade de barras", true)
         val note = field("Observação (opcional)", false)
-        b.addView(push); b.addView(pull); b.addView(note)
+        val workoutDate = datePickerControl("DATA DO TREINO", date)
+        b.addView(push); b.addView(pull); b.addView(note); b.addView(workoutDate)
         action(b, "＋  SALVAR TREINO") {
             val p = push.text.toString().toIntOrNull() ?: 0
             val q = pull.text.toString().toIntOrNull() ?: 0
-            if (p < 0 || q < 0 || (p == 0 && q == 0)) toast("Informe pelo menos uma quantidade válida") else {
+            val selectedDate = workoutDate.tag as? String ?: date
+            if (p < 0 || q < 0 || (p == 0 && q == 0) || !validDate(selectedDate)) toast("Informe quantidades e uma data válida") else {
                 val a = readArray("workouts")
-                a.put(JSONObject().put("id", newId()).put("date", date).put("push", p).put("pull", q).put("note", note.text.toString()))
+                a.put(JSONObject().put("id", newId()).put("date", selectedDate).put("push", p).put("pull", q).put("note", note.text.toString()))
                 saveArray("workouts", a); awardXp(10, "Treino registrado"); syncAchievements(); showPage("body"); toast("Treino salvo")
             }
         }
@@ -488,11 +511,13 @@ class MainActivity : Activity() {
         }
         val title = field("Título do avanço", false)
         val detail = field("O que aconteceu? Qual o próximo passo?", false, true)
-        b.addView(title); b.addView(detail)
+        val socialDate = datePickerControl("DATA DO AVANÇO", date)
+        b.addView(title); b.addView(detail); b.addView(socialDate)
         action(b, "＋  REGISTRAR AVANÇO") {
-            if (title.text.isNullOrBlank() || detail.text.isNullOrBlank()) toast("Preencha título e descrição") else {
+            val selectedDate = socialDate.tag as? String ?: date
+            if (title.text.isNullOrBlank() || detail.text.isNullOrBlank() || !validDate(selectedDate)) toast("Preencha título, descrição e data") else {
                 val a = readArray("social")
-                a.put(JSONObject().put("id", newId()).put("date", date).put("title", title.text.toString().trim()).put("detail", detail.text.toString().trim()))
+                a.put(JSONObject().put("id", newId()).put("date", selectedDate).put("title", title.text.toString().trim()).put("detail", detail.text.toString().trim()))
                 saveArray("social", a); awardXp(10, "Avanço registrado"); showPage("social"); toast("Avanço registrado")
             }
         }
@@ -537,13 +562,14 @@ class MainActivity : Activity() {
         val category = spinner(arrayOf("Negócio", "Corpo", "Conhecimento", "Finanças", "Pessoal"))
         val priority = spinner(arrayOf("CRÍTICA", "ALTA", "NORMAL", "BAIXA"))
         val difficulty = spinner(arrayOf("Fácil", "Média", "Difícil"))
-        val due = field("Prazo (AAAA-MM-DD)", false).apply { setText(date) }
+        val due = datePickerControl("PRAZO DA MISSÃO", date)
         val dueTime = field("Horário (HH:mm) — opcional", false)
         b.addView(label("NOVA MISSÃO", 12, AQUA, true)); b.addView(title); b.addView(desc)
         addFormChoice(b, "CATEGORIA", category); addFormChoice(b, "PRIORIDADE", priority); addFormChoice(b, "DIFICULDADE", difficulty); b.addView(due); b.addView(dueTime)
         action(b, "＋  CRIAR MISSÃO") {
             if (title.text.isNullOrBlank()) { toast("Informe o título da missão"); return@action }
-            if (due.text.isNotBlank() && !validDate(due.text.toString().trim())) { toast("Prazo inválido. Use AAAA-MM-DD"); return@action }
+            val selectedDue = due.tag as? String ?: date
+            if (!validDate(selectedDue)) { toast("Selecione um prazo válido"); return@action }
             if (dueTime.text.isNotBlank() && !validTime(dueTime.text.toString().trim())) { toast("Horário inválido. Use HH:mm"); return@action }
             val activePriority = countPriorityMissionsToday()
             if (priority.selectedItem.toString() in listOf("CRÍTICA", "ALTA") && activePriority >= 3) {
@@ -553,7 +579,7 @@ class MainActivity : Activity() {
             val missions = readArray("missions")
             missions.put(JSONObject().put("id", newId()).put("title", title.text.toString().trim()).put("description", desc.text.toString().trim())
                 .put("category", category.selectedItem.toString()).put("priority", priority.selectedItem.toString()).put("difficulty", difficulty.selectedItem.toString())
-                .put("due", due.text.toString().trim().ifBlank { date }).put("dueTime", dueTime.text.toString().trim()).put("status", "pendente").put("createdAt", date).put("deferCount", 0))
+                .put("due", selectedDue).put("dueTime", dueTime.text.toString().trim()).put("status", "pendente").put("createdAt", date).put("deferCount", 0).put("overdueNotified", false))
             saveArray("missions", missions); showPage("missions"); toast("Missão criada")
         }
         b.addView(label("MISSÕES ATIVAS E HISTÓRICO", 12, AQUA, true))
@@ -603,7 +629,7 @@ class MainActivity : Activity() {
 
     private fun deferMission(id: String) {
         val mission = findById(readArray("missions"), id) ?: return
-        val nextDue = field("Novo prazo (AAAA-MM-DD)", false).apply { setText(dateAfterDays(1)) }
+        val nextDue = datePickerControl("NOVO PRAZO", dateAfterDays(1))
         val reason = spinner(avoidanceReasons)
         val rating = RatingBar(this).apply { numStars = 10; stepSize = 1f; rating = 5f; progressTintList = android.content.res.ColorStateList.valueOf(WARNING) }
         val box = verticalBox(
@@ -616,13 +642,13 @@ class MainActivity : Activity() {
             .setMessage("O adiamento será registrado no histórico. Escolha um prazo concreto para a retomada.")
             .setView(box).setNegativeButton("Voltar", null)
             .setPositiveButton("REGISTRAR E REPROGRAMAR") { _, _ ->
-                val newDate = nextDue.text.toString().trim()
+                val newDate = nextDue.tag as? String ?: ""
                 if (!validDate(newDate) || newDate < date) { toast("Informe um prazo válido a partir de hoje"); return@setPositiveButton }
                 saveAvoidance(mission.optString("title"), reason.selectedItem.toString(), rating.rating.toInt().coerceIn(1, 10), id)
                 val latest = readArray("missions")
                 findById(latest, id)?.apply {
                     if (!has("originalDue")) put("originalDue", optString("due"))
-                    put("due", newDate).put("rescheduledAt", date).put("status", "adiada")
+                    put("due", newDate).put("rescheduledAt", date).put("status", "adiada").put("overdueNotified", false)
                 }
                 saveArray("missions", latest)
                 showPage("missions"); toast("Missão reprogramada para $newDate")
@@ -640,24 +666,27 @@ class MainActivity : Activity() {
         val category = spinner(categoryItems).apply { setSelection(categoryItems.indexOf(mission.optString("category")).coerceAtLeast(0)) }
         val priority = spinner(priorityItems).apply { setSelection(priorityItems.indexOf(mission.optString("priority")).coerceAtLeast(0)) }
         val difficulty = spinner(difficultyItems).apply { setSelection(difficultyItems.indexOf(mission.optString("difficulty")).coerceAtLeast(0)) }
-        val due = field("Prazo (AAAA-MM-DD)", false).apply { setText(mission.optString("due")) }
+        val due = datePickerControl("PRAZO DA MISSÃO", mission.optString("due", date))
         val dueTime = field("Horário (HH:mm) — opcional", false).apply { setText(mission.optString("dueTime")) }
         val box = verticalBox(title, description, label("CATEGORIA", 10, MUTED, true), category,
             label("PRIORIDADE", 10, MUTED, true), priority, label("DIFICULDADE", 10, MUTED, true), difficulty, due, dueTime)
         AlertDialog.Builder(this).setTitle("Editar missão").setView(box).setNegativeButton("Cancelar", null)
             .setPositiveButton("Salvar alterações") { _, _ ->
-                val newDate = due.text.toString().trim(); val newTime = dueTime.text.toString().trim()
+                val newDate = due.tag as? String ?: ""; val newTime = dueTime.text.toString().trim()
                 if (title.text.isNullOrBlank()) { toast("Informe o título da missão"); return@setPositiveButton }
-                if (newDate.isNotBlank() && !validDate(newDate)) { toast("Prazo inválido"); return@setPositiveButton }
+                if (newDate.isBlank() || !validDate(newDate)) { toast("Selecione um prazo válido"); return@setPositiveButton }
                 if (newTime.isNotBlank() && !validTime(newTime)) { toast("Horário inválido"); return@setPositiveButton }
                 if (priority.selectedItem.toString() in listOf("CRÍTICA", "ALTA") &&
                     (mission.optString("priority") !in listOf("CRÍTICA", "ALTA") || mission.optString("due") != newDate) &&
                     (newDate == date || mission.optString("createdAt") == date) && countPriorityMissionsToday(id) >= 3) {
                     toast("O limite de três missões prioritárias para hoje já foi atingido"); return@setPositiveButton
                 }
+                val previousDue = mission.optString("due")
+                val previousTime = mission.optString("dueTime")
                 mission.put("title", title.text.toString().trim()).put("description", description.text.toString().trim())
                     .put("category", category.selectedItem.toString()).put("priority", priority.selectedItem.toString())
-                    .put("difficulty", difficulty.selectedItem.toString()).put("due", newDate.ifBlank { date }).put("dueTime", newTime)
+                    .put("difficulty", difficulty.selectedItem.toString()).put("due", newDate).put("dueTime", newTime)
+                if (previousDue != newDate || previousTime != newTime) mission.put("overdueNotified", false)
                 saveArray("missions", missions); showPage("missions")
             }.show()
     }
@@ -767,6 +796,7 @@ class MainActivity : Activity() {
                 val buttons = horizontal()
                 smallButton(buttons, "META NORMAL", AQUA) { logHabit(habit.optString("id"), false) }
                 smallButton(buttons, "META MÍNIMA", PANEL) { logHabit(habit.optString("id"), true) }
+                smallButton(buttons, "OUTRA DATA", PANEL) { logHabitOnOtherDate(habit.optString("id")) }
                 smallButton(buttons, "EDITAR", PANEL) { editHabit(habit.optString("id")) }
                 smallButton(buttons, "EXCLUIR", 0xFF301216.toInt()) { deleteHabit(habit.optString("id")) }
                 addView(buttons)
@@ -777,19 +807,38 @@ class MainActivity : Activity() {
         if (all.length() > 0) habitCalendar(b, all)
     }
 
-    private fun logHabit(id: String, minimum: Boolean) {
+    private fun logHabit(id: String, minimum: Boolean, selectedDate: String = date) {
         val habits = readArray("habits"); val habit = findById(habits, id) ?: return
+        if (!validDate(selectedDate) || selectedDate > date) { toast("Escolha hoje ou uma data anterior"); return }
         val logs = habit.optJSONArray("logs") ?: JSONArray()
         val amount = if (minimum) habit.optDouble("minimum") else habit.optDouble("normal")
-        val existing = findLogForDate(logs, date)
-        val entry = JSONObject().put("date", date).put("amount", amount).put("kind", if (minimum) "mínima" else "normal")
+        val existing = findLogForDate(logs, selectedDate)
+        val entry = JSONObject().put("date", selectedDate).put("amount", amount).put("kind", if (minimum) "mínima" else "normal")
         if (existing != null) {
-            val fresh = JSONArray(); for (i in 0 until logs.length()) { val item = logs.optJSONObject(i) ?: continue; if (item.optString("date") == date) fresh.put(entry) else fresh.put(item) }
+            val fresh = JSONArray(); for (i in 0 until logs.length()) { val item = logs.optJSONObject(i) ?: continue; if (item.optString("date") == selectedDate) fresh.put(entry) else fresh.put(item) }
             habit.put("logs", fresh)
         } else { logs.put(entry); habit.put("logs", logs) }
         saveArray("habits", habits)
         awardXp(if (minimum) 15 else 25, "Hábito ${if (minimum) "mínimo" else "normal"}: ${habit.optString("name")}")
         syncAchievements(); showPage("habits")
+    }
+
+    private fun logHabitOnOtherDate(id: String) {
+        val habit = findById(readArray("habits"), id) ?: return
+        val selectedDate = datePickerControl("DATA DO REGISTRO", date)
+        val kind = spinner(arrayOf("Meta normal", "Meta mínima"))
+        val box = verticalBox(
+            label("HÁBITO: ${habit.optString("name")}", 11, AQUA, true),
+            selectedDate,
+            label("TIPO DE REGISTRO", 10, MUTED, true), kind
+        )
+        AlertDialog.Builder(this).setTitle("Registrar em outra data").setView(box)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("REGISTRAR") { _, _ ->
+                val value = selectedDate.tag as? String ?: ""
+                if (!validDate(value) || value > date) { toast("Escolha hoje ou uma data anterior"); return@setPositiveButton }
+                logHabit(id, kind.selectedItemPosition == 1, value)
+            }.show()
     }
 
     private fun editHabit(id: String) {
@@ -1251,7 +1300,6 @@ class MainActivity : Activity() {
     private fun analyticsPage(b: LinearLayout) {
         header(b, "10 / ANALYTICS", "Relatório operacional")
         val missions = readArray("missions")
-        val tasks = readArray("todos")
         val habits = readArray("habits")
         val avoid = readArray("avoidance")
         val sessions = readArray("focus_sessions")
@@ -1286,7 +1334,6 @@ class MainActivity : Activity() {
         val monthNet = sumBetween("income", monthStart, end) - sumBetween("expenses", monthStart, end)
         val monthTaskPush = sumWorkout(monthStart, end, "push")
         val monthTaskPull = sumWorkout(monthStart, end, "pull")
-        val taskDone = (0 until tasks.length()).count { tasks.optJSONObject(it)?.optBoolean("done") == true }
         val difficultPlanned = (0 until missions.length()).count { val m = missions.optJSONObject(it); m != null && m.optString("createdAt") in start..end && m.optString("difficulty") == "Difícil" }
         val difficultStarted = (0 until missions.length()).count { val m = missions.optJSONObject(it); m != null && m.optString("createdAt") in start..end && m.optString("difficulty") == "Difícil" && m.optString("startedAt").isNotBlank() }
         val facingRate = if (difficultPlanned == 0) null else difficultStarted * 100 / difficultPlanned
@@ -1294,7 +1341,6 @@ class MainActivity : Activity() {
             addView(label("SEMANA  /  $start ATÉ $end", 10, MUTED, true))
             addView(label("MISSÕES  $completed / $planned", 20, INK, true))
             addView(progressBar(if (planned == 0) 0 else completed * 100 / planned))
-            addView(label("Tarefas cadastradas: ${tasks.length()}  •  concluídas no total: $taskDone", 11, MUTED))
             addView(label("Hábitos realizados: $habitDone  •  adiamentos: $deferred", 11, MUTED))
             addView(label("Foco efetivo: ${focusMins / 60}h ${focusMins % 60}min", 11, MUTED))
             addView(label("Financeiro semanal: ${if (weekNet >= 0) "+" else "−"} R$ ${money(kotlin.math.abs(weekNet))}", 11, MUTED))
@@ -1387,7 +1433,7 @@ class MainActivity : Activity() {
 
     private fun sumBetween(key: String, from: String, to: String): Double {
         val a = readArray(key); var sum = 0.0
-        for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; val d = o.optString("date"); if (d in from..to) sum += o.optDouble("amount") }
+        for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; val d = o.optString("date"); if (d in from..to) sum += transactionAmount(o) }
         return sum
     }
 
@@ -1496,14 +1542,21 @@ class MainActivity : Activity() {
             toast("Metas atualizadas")
         }
         val notify = CheckBox(this).apply {
-            text = "Habilitar lembretes locais de hábitos"
+            text = "Habilitar lembretes de hábitos e avisos de prazos"
             textSize = 12f
             setTextColor(INK)
             isChecked = prefs.getBoolean("notifications_enabled", true)
             if (Build.VERSION.SDK_INT >= 21) buttonTintList = android.content.res.ColorStateList.valueOf(AQUA)
             setOnCheckedChangeListener { _, checked ->
                 prefs.edit().putBoolean("notifications_enabled", checked).apply()
-                if (checked) { requestNotificationPermissionIfNeeded(); scheduleAllHabitReminders() } else cancelAllHabitReminders()
+                if (checked) {
+                    requestNotificationPermissionIfNeeded()
+                    scheduleAllHabitReminders()
+                    DeadlineReminderScheduler.syncAll(this@MainActivity)
+                } else {
+                    cancelAllHabitReminders()
+                    DeadlineReminderScheduler.syncAll(this@MainActivity)
+                }
             }
         }
         b.addView(notify)
@@ -1581,7 +1634,11 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 7201) toast(if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) "Notificações habilitadas" else "Permissão de notificações não concedida")
+        if (requestCode == 7201) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            toast(if (granted) "Notificações habilitadas" else "Permissão de notificações não concedida")
+            if (granted) DeadlineReminderScheduler.syncAll(this)
+        }
     }
 
     private fun setHabitReminder(habit: JSONObject) {
@@ -1625,15 +1682,16 @@ class MainActivity : Activity() {
 
     private fun editMoneyRecord(key: String, index: Int) {
         val arr = readArray(key); val item = arr.optJSONObject(index) ?: return
-        val amount = field("Valor", true).apply { setText(item.optString("amount")) }
+        val amount = field("Valor", true).apply { setText(transactionAmount(item).toString()) }
         val desc = field("Descrição", false).apply { setText(item.optString("desc")) }
-        val dateField = field("Data (AAAA-MM-DD)", false).apply { setText(item.optString("date", date)) }
+        val dateField = datePickerControl("DATA DO REGISTRO", item.optString("date", date))
         val box = verticalBox(amount, desc, dateField)
         AlertDialog.Builder(this).setTitle(if (key == "income") "Editar receita" else "Editar gasto").setView(box)
             .setNegativeButton("Cancelar", null).setPositiveButton("Salvar") { _, _ ->
                 val parsed = parseAmount(amount.text.toString())
-                if (parsed == null || parsed <= 0 || !validDate(dateField.text.toString().trim())) { toast("Confira valor e data"); return@setPositiveButton }
-                item.put("amount", parsed).put("desc", desc.text.toString().ifBlank { if (key == "income") "Receita" else "Gasto" }).put("date", dateField.text.toString().trim())
+                val selectedDate = dateField.tag as? String ?: date
+                if (parsed == null || parsed <= 0 || !validDate(selectedDate)) { toast("Confira valor e data"); return@setPositiveButton }
+                item.put("amount", parsed).put("desc", desc.text.toString().ifBlank { if (key == "income") "Receita" else "Gasto" }).put("date", selectedDate)
                 saveArray(key, arr); refreshWidgets(); showPage("money"); toast("Registro atualizado")
             }.show()
     }
@@ -1643,13 +1701,14 @@ class MainActivity : Activity() {
         val push = field("Quantidade de flexões", true).apply { setText(item.optString("push")) }
         val pull = field("Quantidade de barras", true).apply { setText(item.optString("pull")) }
         val note = field("Observação", false, true).apply { setText(item.optString("note")) }
-        val dateField = field("Data (AAAA-MM-DD)", false).apply { setText(item.optString("date", date)) }
+        val dateField = datePickerControl("DATA DO TREINO", item.optString("date", date))
         val box = verticalBox(push, pull, note, dateField)
         AlertDialog.Builder(this).setTitle("Editar treino").setView(box).setNegativeButton("Cancelar", null)
             .setPositiveButton("Salvar") { _, _ ->
                 val p = push.text.toString().toIntOrNull(); val q = pull.text.toString().toIntOrNull()
-                if (p == null || q == null || p < 0 || q < 0 || (p == 0 && q == 0) || !validDate(dateField.text.toString().trim())) { toast("Confira quantidades e data"); return@setPositiveButton }
-                item.put("push", p).put("pull", q).put("note", note.text.toString()).put("date", dateField.text.toString().trim())
+                val selectedDate = dateField.tag as? String ?: ""
+                if (p == null || q == null || p < 0 || q < 0 || (p == 0 && q == 0) || !validDate(selectedDate)) { toast("Confira quantidades e data"); return@setPositiveButton }
+                item.put("push", p).put("pull", q).put("note", note.text.toString()).put("date", selectedDate)
                 saveArray("workouts", arr); showPage("body"); toast("Treino atualizado")
             }.show()
     }
@@ -1658,12 +1717,13 @@ class MainActivity : Activity() {
         val arr = readArray("social"); val item = arr.optJSONObject(index) ?: return
         val title = field("Título", false).apply { setText(item.optString("title")) }
         val detail = field("Descrição / evolução", false, true).apply { setText(item.optString("detail")) }
-        val dateField = field("Data (AAAA-MM-DD)", false).apply { setText(item.optString("date", date)) }
+        val dateField = datePickerControl("DATA DO AVANÇO", item.optString("date", date))
         val box = verticalBox(title, detail, dateField)
         AlertDialog.Builder(this).setTitle("Editar evolução").setView(box).setNegativeButton("Cancelar", null)
             .setPositiveButton("Salvar") { _, _ ->
-                if (title.text.isNullOrBlank() || detail.text.isNullOrBlank() || !validDate(dateField.text.toString().trim())) { toast("Preencha título, descrição e data válida"); return@setPositiveButton }
-                item.put("title", title.text.toString().trim()).put("detail", detail.text.toString().trim()).put("date", dateField.text.toString().trim())
+                val selectedDate = dateField.tag as? String ?: ""
+                if (title.text.isNullOrBlank() || detail.text.isNullOrBlank() || !validDate(selectedDate)) { toast("Preencha título, descrição e data válida"); return@setPositiveButton }
+                item.put("title", title.text.toString().trim()).put("detail", detail.text.toString().trim()).put("date", selectedDate)
                 saveArray("social", arr); showPage("social"); toast("Evolução atualizada")
             }.show()
     }
@@ -1672,6 +1732,62 @@ class MainActivity : Activity() {
     // UI and data helpers.
     // ---------------------------------------------------------------------
     private fun refreshWidgets() { IncomeWidgetProvider.refreshAll(this); TodoWidgetProvider.refreshAll(this) }
+    private fun datePickerControl(title: String, initialDate: String, optional: Boolean = false): TextView {
+        val initial = initialDate.takeIf { validDate(it) } ?: if (optional) "" else date
+        val control = TextView(this).apply {
+            tag = initial
+            textSize = 11f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(INK)
+            setPadding(12, 13, 12, 13)
+            background = rounded(PANEL_2, GRID, 10f)
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { setMargins(0, 5, 0, 5) }
+            isClickable = true
+            isFocusable = true
+        }
+        fun updateLabel() {
+            val raw = control.tag as? String ?: ""
+            val shown = if (raw.isBlank()) "Sem data definida" else
+                parseDate(raw)?.let { SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(it) } ?: raw
+            control.text = "$title  ·  $shown   ▾"
+        }
+        updateLabel()
+        control.setOnClickListener {
+            val selected = (control.tag as? String)?.takeIf { it.isNotBlank() }?.let { parseDate(it) }
+            val calendar = Calendar.getInstance().apply { if (selected != null) time = selected }
+            val dialog = DatePickerDialog(
+                this,
+                { _, year, month, day ->
+                    val chosen = Calendar.getInstance().apply { set(year, month, day, 12, 0, 0); set(Calendar.MILLISECOND, 0) }
+                    control.tag = dateOf(chosen)
+                    updateLabel()
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            )
+            if (optional) dialog.setButton(android.content.DialogInterface.BUTTON_NEUTRAL, "Limpar") { _, _ ->
+                control.tag = ""
+                updateLabel()
+            }
+            dialog.show()
+        }
+        return control
+    }
+
+    private fun transactionAmount(item: JSONObject): Double {
+        val raw = when {
+            !item.isNull("amount") -> item.opt("amount")
+            !item.isNull("value") -> item.opt("value")
+            !item.isNull("valor") -> item.opt("valor")
+            else -> null
+        }
+        if (raw is Number) return raw.toDouble()
+        val text = raw?.toString()?.replace("R$", "")?.replace(" ", "") ?: return 0.0
+        val normalized = if (text.contains(",")) text.replace(".", "").replace(",", ".") else text
+        return normalized.toDoubleOrNull() ?: 0.0
+    }
+
     private fun parseAmount(raw: String): Double? = raw.trim().replace("R$", "").replace(" ", "").let { if (it.contains(",")) it.replace(".", "").replace(",", ".").toDoubleOrNull() else it.toDoubleOrNull() }
     private fun header(b: LinearLayout, tag: String, title: String) { b.addView(label(tag, 10, AQUA, true)); b.addView(label(title, 26, INK, true)) }
     private fun label(s: String, size: Int, color: Int, bold: Boolean = false) = TextView(this).apply {
@@ -1724,22 +1840,108 @@ class MainActivity : Activity() {
         card(parent) { val r = horizontal(); r.addView(label(left, 11, INK, true), LinearLayout.LayoutParams(0, -2, 1f)); r.addView(label(right, 11, AQUA, true)); addView(r) }
     }
     private fun readArray(key: String) = try { JSONArray(prefs.getString(key, "[]")) } catch (_: Exception) { JSONArray() }
-    private fun saveArray(key: String, a: JSONArray) { prefs.edit().putString(key, a.toString()).apply() }
+    private fun saveArray(key: String, a: JSONArray) {
+        prefs.edit().putString(key, a.toString()).apply()
+        if (key == "missions" || key == "todos") {
+            if (key == "missions") TodoWidgetProvider.refreshAll(this)
+            if (prefs.getBoolean("notifications_enabled", true)) {
+                DeadlineReminderScheduler.syncAll(this)
+                if (hasActiveDeadlines()) requestNotificationPermissionIfNeeded()
+            }
+        }
+    }
+    private fun hasActiveDeadlines(): Boolean {
+        val tasks = readArray("todos")
+        for (i in 0 until tasks.length()) {
+            val item = tasks.optJSONObject(i) ?: continue
+            if (!item.optBoolean("done") && item.optString("due").isNotBlank() && !item.optBoolean("overdueNotified")) return true
+        }
+        val missions = readArray("missions")
+        for (i in 0 until missions.length()) {
+            val item = missions.optJSONObject(i) ?: continue
+            if (item.optString("status", "pendente") !in listOf("concluída", "cancelada") && item.optString("due").isNotBlank() && !item.optBoolean("overdueNotified")) return true
+        }
+        return false
+    }
     private fun findById(array: JSONArray, id: String): JSONObject? { for (i in 0 until array.length()) { val item = array.optJSONObject(i) ?: continue; if (item.optString("id") == id) return item }; return null }
     private fun findLogForDate(logs: JSONArray, d: String): JSONObject? { for (i in 0 until logs.length()) { val item = logs.optJSONObject(i) ?: continue; if (item.optString("date") == d) return item }; return null }
     private fun newId() = UUID.randomUUID().toString()
-    private fun totalIncome(): Double { val a = readArray("income"); var s = 0.0; for (i in 0 until a.length()) s += a.optJSONObject(i)?.optDouble("amount", 0.0) ?: 0.0; return s }
-    private fun totalExpenses(): Double { val a = readArray("expenses"); var s = 0.0; for (i in 0 until a.length()) s += a.optJSONObject(i)?.optDouble("amount", 0.0) ?: 0.0; return s }
+    private fun totalIncome(): Double { val a = readArray("income"); var s = 0.0; for (i in 0 until a.length()) s += a.optJSONObject(i)?.let { transactionAmount(it) } ?: 0.0; return s }
+    private fun totalExpenses(): Double { val a = readArray("expenses"); var s = 0.0; for (i in 0 until a.length()) s += a.optJSONObject(i)?.let { transactionAmount(it) } ?: 0.0; return s }
     private fun sumMonthIncome(): Double {
         val cal = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }; return sumBetween("income", dateOf(cal), date)
     }
-    private fun sumToday(key: String): Double { val a = readArray(key); var s = 0.0; for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; if (o.optString("date") == date) s += o.optDouble("amount", 0.0) }; return s }
+    private fun sumToday(key: String): Double { val a = readArray(key); var s = 0.0; for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; if (o.optString("date") == date) s += transactionAmount(o) }; return s }
     private fun todayIncome() = sumToday("income")
     private fun todayExpenses() = sumToday("expenses")
     private fun todayNet() = todayIncome() - todayExpenses()
     private fun pendingTodos(): JSONArray { val all = readArray("todos"); val out = JSONArray(); for (i in 0 until all.length()) { val o = all.optJSONObject(i) ?: continue; if (!o.optBoolean("done")) out.put(o) }; return out }
     private fun todayExercise(): Pair<Int, Int> { val a = readArray("workouts"); var p = 0; var q = 0; for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; if (o.optString("date") == date) { p += o.optInt("push"); q += o.optInt("pull") } }; return p to q }
     private fun allExerciseTotals(): Pair<Int, Int> { val a = readArray("workouts"); var p = 0; var q = 0; for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; p += o.optInt("push"); q += o.optInt("pull") }; return p to q }
+    private fun personalExerciseRecord(key: String): Pair<Int, String> {
+        val workouts = readArray("workouts")
+        var best = 0
+        var bestDate = ""
+        for (i in 0 until workouts.length()) {
+            val item = workouts.optJSONObject(i) ?: continue
+            val value = item.optInt(key)
+            if (value > best) { best = value; bestDate = item.optString("date") }
+        }
+        val formatted = if (bestDate.isBlank()) "" else try { SimpleDateFormat("dd/MM/yy", Locale("pt", "BR")).format(parseDate(bestDate)!!) } catch (_: Exception) { bestDate }
+        return best to formatted
+    }
+    private fun exerciseDayTrend(key: String): Triple<String, String, Int> {
+        val byDay = sortedMapOf<String, Int>()
+        val workouts = readArray("workouts")
+        for (i in 0 until workouts.length()) {
+            val item = workouts.optJSONObject(i) ?: continue
+            val d = item.optString("date")
+            if (validDate(d)) byDay[d] = (byDay[d] ?: 0) + item.optInt(key)
+        }
+        if (byDay.size < 2) return Triple("●", "SEM COMPARAÇÃO", MUTED)
+        val values = byDay.values.toList()
+        val previous = values[values.lastIndex - 1]
+        val latest = values.last()
+        return when {
+            latest > previous -> Triple("▲", "MELHOR QUE O ÚLTIMO TREINO", AQUA)
+            latest < previous -> Triple("▼", "ABAIXO DO ÚLTIMO TREINO", DANGER)
+            else -> Triple("◆", "IGUAL AO ÚLTIMO TREINO", WARNING)
+        }
+    }
+    private fun monthlyPatrimonySeries(): List<Pair<String, Double>> {
+        val calendar = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
+        val start = dateOf(calendar)
+        val netByDate = sortedMapOf<String, Double>()
+        listOf("income" to 1.0, "expenses" to -1.0).forEach { (key, sign) ->
+            val entries = readArray(key)
+            for (i in 0 until entries.length()) {
+                val item = entries.optJSONObject(i) ?: continue
+                val d = item.optString("date")
+                if (d >= start && d <= date) netByDate[d] = (netByDate[d] ?: 0.0) + sign * transactionAmount(item)
+            }
+        }
+        var running = totalBeforeDate(start)
+        val result = mutableListOf<Pair<String, Double>>()
+        val day = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
+        while (dateOf(day) <= date) {
+            val d = dateOf(day)
+            running += netByDate[d] ?: 0.0
+            result.add(d.substring(8, 10) to running)
+            day.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return result
+    }
+    private fun totalBeforeDate(before: String): Double {
+        var total = 0.0
+        listOf("income" to 1.0, "expenses" to -1.0).forEach { (key, sign) ->
+            val entries = readArray(key)
+            for (i in 0 until entries.length()) {
+                val item = entries.optJSONObject(i) ?: continue
+                if (item.optString("date") < before) total += sign * transactionAmount(item)
+            }
+        }
+        return total
+    }
     private fun workoutDirection(): Pair<String, String> {
         val a = readArray("workouts"); val cal = Calendar.getInstance(); val current = cal.timeInMillis; val week = 7L * 24L * 60L * 60L * 1000L
         var recent = 0; var previous = 0
@@ -1749,7 +1951,7 @@ class MainActivity : Activity() {
     private fun lastSevenDaysNet(): List<Pair<String, Double>> {
         val totals = linkedMapOf<String, Double>(); val calendar = Calendar.getInstance(); calendar.add(Calendar.DAY_OF_YEAR, -6)
         repeat(7) { totals[dateOf(calendar)] = 0.0; calendar.add(Calendar.DAY_OF_YEAR, 1) }
-        listOf("income" to 1.0, "expenses" to -1.0).forEach { (key, sign) -> val entries = readArray(key); for (i in 0 until entries.length()) { val item = entries.optJSONObject(i) ?: continue; val d = item.optString("date"); if (totals.containsKey(d)) totals[d] = (totals[d] ?: 0.0) + sign * item.optDouble("amount") } }
+        listOf("income" to 1.0, "expenses" to -1.0).forEach { (key, sign) -> val entries = readArray(key); for (i in 0 until entries.length()) { val item = entries.optJSONObject(i) ?: continue; val d = item.optString("date"); if (totals.containsKey(d)) totals[d] = (totals[d] ?: 0.0) + sign * transactionAmount(item) } }
         return totals.map { it.key.takeLast(5) to it.value }
     }
     private fun money(v: Double) = String.format(Locale("pt", "BR"), "%,.2f", v)
@@ -1786,17 +1988,51 @@ private class ProgressChart(context: Context, private val points: List<Triple<St
 private class IncomeChart(context: Context, private val points: List<Pair<String, Double>>) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas); val w = width.toFloat(); val h = height.toFloat(); val left = 12f; val right = w - 8f; val top = 18f; val bottom = h - 28f
-        val maxValue = (points.maxOfOrNull { kotlin.math.abs(it.second) }?.coerceAtLeast(1.0) ?: 1.0).toFloat(); val zero = top + (bottom - top) / 2f
-        paint.color = GRID; paint.strokeWidth = 1f; for (i in 0..3) { val y = top + i * (bottom - top) / 3f; canvas.drawLine(left, y, right, y, paint) }
+        super.onDraw(canvas)
         if (points.isEmpty()) return
-        val slot = (right - left) / points.size.toFloat(); val path = Path()
-        points.forEachIndexed { index, point ->
-            val x = left + slot * (index + .5f); val y = zero - (point.second / maxValue).toFloat() * (bottom - top) / 2f
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-            paint.color = if (point.second < 0) DANGER else AQUA; paint.style = Paint.Style.FILL; canvas.drawCircle(x, y, 4f, paint)
-            paint.color = MUTED; paint.textSize = 10f; canvas.drawText(point.first, x - paint.measureText(point.first) / 2f, h - 5f, paint)
+        val w = width.toFloat(); val h = height.toFloat()
+        val left = 42f; val right = w - 12f; val top = 20f; val bottom = h - 24f
+        val values = points.map { it.second }
+        val minValue = values.minOrNull() ?: 0.0
+        val maxValue = values.maxOrNull() ?: 1.0
+        val range = (maxValue - minValue).coerceAtLeast(1.0)
+        val up = (values.lastOrNull() ?: 0.0) >= (values.firstOrNull() ?: 0.0)
+        val lineColor = if (up) AQUA else DANGER
+        fun y(value: Double) = bottom - (((value - minValue) / range).toFloat() * (bottom - top))
+        paint.color = GRID; paint.strokeWidth = 1f
+        for (i in 0..3) {
+            val yy = top + i * (bottom - top) / 3f
+            canvas.drawLine(left, yy, right, yy, paint)
         }
-        paint.color = AQUA; paint.strokeWidth = 3f; paint.style = Paint.Style.STROKE; paint.strokeCap = Paint.Cap.ROUND; canvas.drawPath(path, paint); paint.style = Paint.Style.FILL
+        val slot = if (points.size <= 1) 0f else (right - left) / (points.size - 1).toFloat()
+        val line = Path()
+        points.forEachIndexed { index, point ->
+            val x = if (points.size == 1) (left + right) / 2f else left + slot * index
+            val yy = y(point.second)
+            if (index == 0) line.moveTo(x, yy) else line.lineTo(x, yy)
+        }
+        val firstX = if (points.size == 1) (left + right) / 2f else left
+        val lastX = if (points.size == 1) (left + right) / 2f else right
+        val fill = Path().apply { addPath(line); lineTo(lastX, bottom); lineTo(firstX, bottom); close() }
+        paint.color = (lineColor and 0x00FFFFFF) or (0x30 shl 24); paint.style = Paint.Style.FILL
+        canvas.drawPath(fill, paint)
+        paint.color = lineColor; paint.strokeWidth = 3.5f; paint.style = Paint.Style.STROKE; paint.strokeCap = Paint.Cap.ROUND; paint.strokeJoin = Paint.Join.ROUND
+        canvas.drawPath(line, paint); paint.style = Paint.Style.FILL
+        points.forEachIndexed { index, point ->
+            if (index == points.lastIndex || index == 0) {
+                val x = if (points.size == 1) (left + right) / 2f else left + slot * index
+                paint.color = lineColor; canvas.drawCircle(x, y(point.second), if (index == points.lastIndex) 5f else 3f, paint)
+            }
+        }
+        paint.color = MUTED; paint.textSize = 10f
+        val firstLabel = points.first().first
+        val lastLabel = points.last().first
+        canvas.drawText(firstLabel, left, h - 5f, paint)
+        val labelWidth = paint.measureText(lastLabel)
+        canvas.drawText(lastLabel, right - labelWidth, h - 5f, paint)
+        paint.color = lineColor; paint.textSize = 11f
+        val finalValue = values.last()
+        val formatted = "R$ " + String.format(Locale("pt", "BR"), "%,.0f", finalValue)
+        canvas.drawText(formatted, left, 13f, paint)
     }
 }
