@@ -72,3 +72,21 @@ O APK será gerado em `app/build/outputs/apk/debug/app-debug.apk`.
 ## Observações de validação
 
 O projeto mantém o Gradle Wrapper e o workflow configurados. Neste ambiente de edição não há Android SDK instalado e a conexão a `services.gradle.org` está indisponível; por isso, a compilação real do APK deve ser confirmada no runner do GitHub Actions. XMLs, arquivos de configuração e estrutura do workflow podem ser verificados localmente antes do push, mas isso não substitui a compilação Android no CI.
+
+
+## Atualização sem conflito de assinatura
+
+O workflow aceita uma chave persistente por meio dos GitHub Actions Secrets:
+`LIFE_EXE_KEYSTORE_BASE64`, `LIFE_EXE_KEYSTORE_PASSWORD`, `LIFE_EXE_KEY_ALIAS` e `LIFE_EXE_KEY_PASSWORD`.
+A chave configurada precisa ser exatamente a mesma usada para assinar o APK atualmente instalado.
+Sem esses secrets, o workflow usa a chave debug efêmera do runner e o Android pode recusar a atualização.
+Não desinstale o aplicativo para contornar o erro antes de exportar e guardar um backup.
+
+## LIFE.EXE 7.5
+
+- Recordes individuais de flexões e barras com a data do melhor treino.
+- Comparação do último dia registrado com o dia anterior registrado, sem considerar datas futuras importadas.
+- Gráfico diário do patrimônio acumulado no mês.
+- Remoção da tela independente de To-do; os dados legados `todos` permanecem armazenados, sem exclusão.
+- Widget de missões calcula a quantidade de linhas usando a altura máxima redimensionada pelo launcher.
+- Alertas de prazo passam a ser agendados para missões do Mission Control.

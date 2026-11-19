@@ -17,7 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Agenda avisos locais para tarefas e missões quando o prazo termina. */
+/** Agenda avisos locais de vencimento para missões do Mission Control. */
 object DeadlineReminderScheduler {
     private const val ACTION_PREFIX = "com.ritmo.planner.DEADLINE."
 
@@ -28,7 +28,9 @@ object DeadlineReminderScheduler {
             cancelAll(context, prefs.getString("missions", "[]"), "mission")
             return
         }
-        scheduleCollection(context, prefs.getString("todos", "[]"), "todo")
+        // The standalone To-do feature was retired; retain its stored data but
+        // only schedule deadline reminders for Mission Control items.
+        cancelAll(context, prefs.getString("todos", "[]"), "todo")
         scheduleCollection(context, prefs.getString("missions", "[]"), "mission")
     }
 
@@ -115,11 +117,11 @@ class DeadlineReminderReceiver : BroadcastReceiver() {
         if (!prefs.getBoolean("notifications_enabled", true)) return
 
         val type = intent.getStringExtra("entity_type") ?: return
-        if (type != "todo" && type != "mission") return
+        if (type != "mission") return
         val id = intent.getStringExtra("entity_id") ?: return
         val scheduledDate = intent.getStringExtra("deadline_date") ?: return
         val scheduledTime = intent.getStringExtra("deadline_time") ?: ""
-        val key = if (type == "todo") "todos" else "missions"
+        val key = "missions"
         val items = try { JSONArray(prefs.getString(key, "[]")) } catch (_: Exception) { JSONArray() }
         var target: JSONObject? = null
         for (i in 0 until items.length()) {
@@ -127,8 +129,7 @@ class DeadlineReminderReceiver : BroadcastReceiver() {
             if (item.optString("id") == id) { target = item; break }
         }
         val item = target ?: return
-        val active = if (type == "todo") !item.optBoolean("done")
-            else item.optString("status", "pendente") !in listOf("concluída", "cancelada")
+        val active = item.optString("status", "pendente") !in listOf("concluída", "cancelada")
         if (!active || item.optBoolean("overdueNotified", false)) return
 
         val currentDate = item.optString("due")
@@ -153,8 +154,7 @@ class DeadlineReminderReceiver : BroadcastReceiver() {
             )
         }
 
-        val page = if (type == "todo") "todo" else "missions"
-        val open = Intent(context, MainActivity::class.java).putExtra("open_page", page)
+        val open = Intent(context, MainActivity::class.java).putExtra("open_page", "missions")
         val openPending = PendingIntent.getActivity(
             context, id.hashCode(), open,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

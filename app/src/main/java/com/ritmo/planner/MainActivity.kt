@@ -198,7 +198,7 @@ class MainActivity : Activity() {
         smallStat(financeRow, "SALDO DE HOJE", "R$ ${money(today)}", if (today >= 0) AQUA else DANGER, 1f) { showPage("money") }
         b.addView(financeRow)
         card(b) {
-            addView(label("⌁  PATRIMÔNIO  /  MÊS ATUAL", 11, AQUA, true))
+            addView(label("⌁  EVOLUÇÃO DO PATRIMÔNIO  /  MÊS ATUAL", 11, AQUA, true))
             addView(label("${if (financeTrend >= 0) "▲" else "▼"} ${if (financeTrend >= 0) "EM ALTA" else "EM QUEDA"}  •  R$ ${money(kotlin.math.abs(financeTrend))} no período", 11, if (financeTrend >= 0) AQUA else DANGER, true))
             addView(IncomeChart(this@MainActivity, finance).apply { layoutParams = LinearLayout.LayoutParams(-1, 125) })
             action(this, "ABRIR FINANCEIRO  ↗", AQUA) { showPage("money") }
@@ -349,113 +349,13 @@ class MainActivity : Activity() {
             }.show()
     }
 
-    private fun todoPage(b: LinearLayout) {
-        header(b, "02 / ORGANIZAÇÃO", "Lista de tarefas")
-        val tasks = readArray("todos")
-        val title = field("O que precisa ser feito?", false)
-        val due = datePickerControl("PRAZO (OPCIONAL)", "", optional = true)
-        val dueTime = field("Horário (HH:mm) — opcional", false)
-        val priority = spinner(arrayOf("Normal", "Alta", "Crítica"))
-        val category = spinner(arrayOf("Pessoal", "Negócio", "Corpo", "Conhecimento", "Finanças"))
-        b.addView(title); b.addView(due); b.addView(dueTime); b.addView(label("PRIORIDADE", 10, MUTED, true)); b.addView(priority)
-        b.addView(label("CATEGORIA", 10, MUTED, true)); b.addView(category)
-        action(b, "＋  ADICIONAR TAREFA") {
-            val text = title.text.toString().trim()
-            val selectedDue = due.tag as? String ?: ""
-            if (text.isBlank()) toast("Digite uma tarefa") else if (selectedDue.isNotBlank() && !validDate(selectedDue)) toast("Selecione um prazo válido") else if (selectedDue.isBlank() && dueTime.text.isNotBlank()) toast("Selecione uma data para definir o horário do prazo") else if (dueTime.text.isNotBlank() && !validTime(dueTime.text.toString().trim())) toast("Horário inválido. Use HH:mm") else {
-                        tasks.put(JSONObject().put("id", newId()).put("title", text).put("done", false).put("due", selectedDue).put("dueTime", dueTime.text.toString().trim()).put("priority", priority.selectedItem.toString()).put("category", category.selectedItem.toString()).put("createdAt", date).put("overdueNotified", false))
-                saveArray("todos", tasks); TodoWidgetProvider.refreshAll(this@MainActivity); showPage("todo"); toast("Tarefa adicionada")
-            }
-        }
-        val pendingCount = (0 until tasks.length()).count { !(tasks.optJSONObject(it)?.optBoolean("done") ?: true) }
-        card(b) { addView(label("$pendingCount PENDENTE(S)  •  ${tasks.length() - pendingCount} CONCLUÍDA(S)", 12, AQUA, true)) }
-        for (i in tasks.length() - 1 downTo 0) {
-            val item = tasks.optJSONObject(i) ?: continue
-            val id = item.optString("id")
-            val done = item.optBoolean("done")
-            val taskDue = item.optString("due")
-            val overdue = !done && taskDue.isNotBlank() && taskDue < date
-            card(b) {
-                val line = horizontal()
-                val check = CheckBox(this@MainActivity).apply {
-                    isChecked = done
-                    if (Build.VERSION.SDK_INT >= 21) buttonTintList = android.content.res.ColorStateList.valueOf(AQUA)
-                    setOnCheckedChangeListener { _, checked -> setTodoDone(id, checked) }
-                }
-                line.addView(check)
-                val titleLabel = label(item.optString("title"), 13, if (done) MUTED else INK, true)
-                if (done) titleLabel.paintFlags = titleLabel.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-                line.addView(titleLabel, LinearLayout.LayoutParams(0, -2, 1f)); addView(line)
-                val dueLabel = if (taskDue.isNotBlank()) "  •  $taskDue${if (item.optString("dueTime").isNotBlank()) " ${item.optString("dueTime")}" else ""}" else ""
-                val meta = "${item.optString("category", "Pessoal")}  •  ${item.optString("priority", "Normal")}" + dueLabel
-                addView(label(if (overdue) "ATRASADA  /  $meta" else meta, 10, if (overdue) DANGER else MUTED))
-                val buttons = horizontal()
-                smallButton(buttons, "EDITAR", PANEL) { editTodo(id) }
-                if (!done) smallButton(buttons, "ADIAR / RESISTÊNCIA", 0xFF302612.toInt()) { logAvoidanceDialog(item.optString("title"), id) }
-                smallButton(buttons, "EXCLUIR", 0xFF301216.toInt()) { deleteTodo(id) }
-                addView(buttons)
-            }
-        }
-        if (tasks.length() == 0) b.addView(label("Sua lista está vazia. Adicione a primeira tarefa.", 12, MUTED))
-        b.addView(label("O widget da tela inicial exibe suas missões ativas.", 10, MUTED))
-    }
-
-    private fun editTodo(id: String) {
-        val item = findById(tasks, id) ?: return
-        val title = field("Tarefa", false).apply { setText(item.optString("title")) }
-        val due = datePickerControl("PRAZO (OPCIONAL)", item.optString("due"), optional = true)
-        val dueTime = field("Horário (HH:mm)", false).apply { setText(item.optString("dueTime")) }
-        val priorityItems = arrayOf("Normal", "Alta", "Crítica")
-        val categoryItems = arrayOf("Pessoal", "Negócio", "Corpo", "Conhecimento", "Finanças")
-        val priority = spinner(priorityItems).apply { setSelection(priorityItems.indexOf(item.optString("priority", "Normal")).coerceAtLeast(0)) }
-        val category = spinner(categoryItems).apply { setSelection(categoryItems.indexOf(item.optString("category", "Pessoal")).coerceAtLeast(0)) }
-        val box = verticalBox(title, due, dueTime, label("PRIORIDADE", 10, MUTED, true), priority,
-            label("CATEGORIA", 10, MUTED, true), category)
-        AlertDialog.Builder(this).setTitle("Editar tarefa").setView(box).setNegativeButton("Cancelar", null)
-            .setPositiveButton("Salvar") { _, _ ->
-                if (title.text.isNullOrBlank()) { toast("Informe o título"); return@setPositiveButton }
-                val selectedDue = due.tag as? String ?: ""
-                if (selectedDue.isNotBlank() && !validDate(selectedDue)) { toast("Selecione um prazo válido"); return@setPositiveButton }
-                if (selectedDue.isBlank() && dueTime.text.isNotBlank()) { toast("Selecione uma data para definir o horário do prazo"); return@setPositiveButton }
-                if (dueTime.text.isNotBlank() && !validTime(dueTime.text.toString().trim())) { toast("Horário inválido"); return@setPositiveButton }
-                val previousDue = item.optString("due")
-                val previousTime = item.optString("dueTime")
-                val selectedTime = dueTime.text.toString().trim()
-                item.put("title", title.text.toString().trim()).put("due", selectedDue).put("dueTime", selectedTime)
-                    .put("priority", priority.selectedItem.toString()).put("category", category.selectedItem.toString())
-                if (previousDue != selectedDue || previousTime != selectedTime) item.put("overdueNotified", false)
-                saveArray("todos", tasks); TodoWidgetProvider.refreshAll(this); showPage("todo")
-            }.show()
-    }
-
-    private fun setTodoDone(id: String, done: Boolean) {
-        for (i in 0 until tasks.length()) {
-            val item = tasks.optJSONObject(i) ?: continue
-            if (item.optString("id") == id) {
-                val wasDone = item.optBoolean("done")
-                item.put("done", done)
-                if (done && !wasDone) awardXp(10, "Tarefa concluída")
-            }
-        }
-        saveArray("todos", tasks); TodoWidgetProvider.refreshAll(this); syncAchievements(); showPage("todo")
-    }
-
-    private fun deleteTodo(id: String) {
-        AlertDialog.Builder(this).setTitle("Excluir tarefa?").setNegativeButton("Cancelar", null)
-            .setPositiveButton("Excluir") { _, _ ->
-                val old = readArray("todos"); val fresh = JSONArray()
-                for (i in 0 until old.length()) { val item = old.optJSONObject(i) ?: continue; if (item.optString("id") != id) fresh.put(item) }
-                saveArray("todos", fresh); TodoWidgetProvider.refreshAll(this); showPage("todo")
-            }.show()
-    }
-
     private fun bodyPage(b: LinearLayout) {
         header(b, "03 / PERFORMANCE", "Treino físico")
         val today = todayExercise()
         val pushRecord = personalExerciseRecord("push")
         val pullRecord = personalExerciseRecord("pull")
         card(b) {
-            addView(label("SEUS RECORDES PESSOAIS  /  SUPERE-SE", 11, AQUA, true))
+            addView(label("MÁXIMO EM UM TREINO  /  SUPERE-SE", 11, AQUA, true))
             val row = horizontal()
             val pushBox = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
             pushBox.addView(label("FLEXÕES", 10, MUTED, true)); pushBox.addView(label("${pushRecord.first}", 32, INK, true)); pushBox.addView(label(if (pushRecord.second.isBlank()) "Ainda sem recorde" else "Desde ${pushRecord.second}", 10, MUTED))
@@ -1842,8 +1742,8 @@ class MainActivity : Activity() {
     private fun readArray(key: String) = try { JSONArray(prefs.getString(key, "[]")) } catch (_: Exception) { JSONArray() }
     private fun saveArray(key: String, a: JSONArray) {
         prefs.edit().putString(key, a.toString()).apply()
-        if (key == "missions" || key == "todos") {
-            if (key == "missions") TodoWidgetProvider.refreshAll(this)
+        if (key == "missions") {
+            TodoWidgetProvider.refreshAll(this)
             if (prefs.getBoolean("notifications_enabled", true)) {
                 DeadlineReminderScheduler.syncAll(this)
                 if (hasActiveDeadlines()) requestNotificationPermissionIfNeeded()
@@ -1851,15 +1751,11 @@ class MainActivity : Activity() {
         }
     }
     private fun hasActiveDeadlines(): Boolean {
-        val tasks = readArray("todos")
-        for (i in 0 until tasks.length()) {
-            val item = tasks.optJSONObject(i) ?: continue
-            if (!item.optBoolean("done") && item.optString("due").isNotBlank() && !item.optBoolean("overdueNotified")) return true
-        }
         val missions = readArray("missions")
         for (i in 0 until missions.length()) {
             val item = missions.optJSONObject(i) ?: continue
-            if (item.optString("status", "pendente") !in listOf("concluída", "cancelada") && item.optString("due").isNotBlank() && !item.optBoolean("overdueNotified")) return true
+            if (item.optString("status", "pendente") !in listOf("concluída", "cancelada") &&
+                item.optString("due").isNotBlank() && !item.optBoolean("overdueNotified")) return true
         }
         return false
     }
@@ -1875,7 +1771,6 @@ class MainActivity : Activity() {
     private fun todayIncome() = sumToday("income")
     private fun todayExpenses() = sumToday("expenses")
     private fun todayNet() = todayIncome() - todayExpenses()
-    private fun pendingTodos(): JSONArray { val all = readArray("todos"); val out = JSONArray(); for (i in 0 until all.length()) { val o = all.optJSONObject(i) ?: continue; if (!o.optBoolean("done")) out.put(o) }; return out }
     private fun todayExercise(): Pair<Int, Int> { val a = readArray("workouts"); var p = 0; var q = 0; for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; if (o.optString("date") == date) { p += o.optInt("push"); q += o.optInt("pull") } }; return p to q }
     private fun allExerciseTotals(): Pair<Int, Int> { val a = readArray("workouts"); var p = 0; var q = 0; for (i in 0 until a.length()) { val o = a.optJSONObject(i) ?: continue; p += o.optInt("push"); q += o.optInt("pull") }; return p to q }
     private fun personalExerciseRecord(key: String): Pair<Int, String> {
@@ -1896,16 +1791,17 @@ class MainActivity : Activity() {
         for (i in 0 until workouts.length()) {
             val item = workouts.optJSONObject(i) ?: continue
             val d = item.optString("date")
-            if (validDate(d)) byDay[d] = (byDay[d] ?: 0) + item.optInt(key)
+            // Future-dated imported records must not be treated as the latest performance.
+            if (validDate(d) && d <= date) byDay[d] = (byDay[d] ?: 0) + item.optInt(key).coerceAtLeast(0)
         }
         if (byDay.size < 2) return Triple("●", "SEM COMPARAÇÃO", MUTED)
         val values = byDay.values.toList()
         val previous = values[values.lastIndex - 1]
         val latest = values.last()
         return when {
-            latest > previous -> Triple("▲", "MELHOR QUE O ÚLTIMO TREINO", AQUA)
-            latest < previous -> Triple("▼", "ABAIXO DO ÚLTIMO TREINO", DANGER)
-            else -> Triple("◆", "IGUAL AO ÚLTIMO TREINO", WARNING)
+            latest > previous -> Triple("▲", "MELHOR QUE O DIA ANTERIOR", AQUA)
+            latest < previous -> Triple("▼", "ABAIXO DO DIA ANTERIOR", DANGER)
+            else -> Triple("◆", "IGUAL AO DIA ANTERIOR", WARNING)
         }
     }
     private fun monthlyPatrimonySeries(): List<Pair<String, Double>> {

@@ -56,13 +56,18 @@ class TodoWidgetProvider : AppWidgetProvider() {
             }
             val priorityRank = mapOf("CRÍTICA" to 0, "ALTA" to 1, "NORMAL" to 2, "BAIXA" to 3)
             pending.sortWith(compareBy<JSONObject> { it.optString("due", "9999-12-31").ifBlank { "9999-12-31" } }
-                .thenBy { priorityRank[it.optString("priority").uppercase()] ?: 4 })
+                .thenBy { priorityRank[it.optString("priority").uppercase()] ?: 4 }
+                .thenBy { it.optString("title").lowercase() })
 
             val options = manager.getAppWidgetOptions(widgetId)
-            val allocatedHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
-            // Number of rows grows with the actual resized height (up to six rows).
+            val allocatedHeight = options.getInt(
+                AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
+                options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+            )
+            // MAX_HEIGHT tracks user resizing. Reserve 36dp for header and outer padding,
+            // then allocate one compact row for each ~34dp of remaining space.
             val maxRows = if (allocatedHeight > 0) {
-                ((allocatedHeight - 44) / 30).coerceIn(1, 6)
+                ((allocatedHeight - 36) / 34).coerceIn(1, 6)
             } else 2
             val visibleCount = minOf(pending.size, maxRows)
 
@@ -134,25 +139,3 @@ class TodoWidgetProvider : AppWidgetProvider() {
     }
 }
 
-/** Compatibilidade com ações antigas do widget de tarefas. */
-class TodoActionReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val id = intent.getStringExtra(EXTRA_TODO_ID) ?: return
-        val prefs = context.getSharedPreferences("ritmo_data", Context.MODE_PRIVATE)
-        val tasks = try {
-            JSONArray(prefs.getString("todos", "[]"))
-        } catch (_: Exception) {
-            JSONArray()
-        }
-        for (index in 0 until tasks.length()) {
-            val item = tasks.optJSONObject(index) ?: continue
-            if (item.optString("id") == id) item.put("done", !item.optBoolean("done"))
-        }
-        prefs.edit().putString("todos", tasks.toString()).apply()
-        TodoWidgetProvider.refreshAll(context)
-    }
-
-    companion object {
-        const val EXTRA_TODO_ID = "todo_id"
-    }
-}
